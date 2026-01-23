@@ -10,6 +10,13 @@ export default function Home() {
   const leftHeadlines = getHeadlines("left", 25);
   const rightHeadlines = getHeadlines("right", 25);
   const mainHeadline = getMainHeadline();
+  
+  // Get recent headlines for HOT TOPICS (most recent 5 from both columns)
+  const recentLeft = getHeadlines("left", 3);
+  const recentRight = getHeadlines("right", 3);
+  const hotTopics = [...recentLeft, ...recentRight]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
 
   return (
     <>
@@ -48,11 +55,29 @@ export default function Home() {
                   <h2 className="text-neon-cyan text-lg font-semibold border-b border-dark-200/30 pb-2">
                     HOT TOPICS
                   </h2>
-                  <div className="text-gray-500 text-sm">
-                    <p className="text-center py-8 opacity-50">
-                      More content coming soon...
-                    </p>
-                  </div>
+                  {hotTopics.length > 0 ? (
+                    <ul className="space-y-2">
+                      {hotTopics.map((headline) => (
+                        <li key={headline.id} className="headline-bullet py-1">
+                          <a
+                            href={headline.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="neon-link text-sm hover:underline"
+                            title={headline.title}
+                          >
+                            {headline.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-gray-500 text-sm">
+                      <p className="text-center py-8 opacity-50">
+                        More content coming soon...
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
