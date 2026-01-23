@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:server": "NODE_OPTIONS=--max-old-space-size=2048 next build",
     "start": "next start",
     "lint": "next lint",
     "bot": "npx tsx bot/index.ts",
