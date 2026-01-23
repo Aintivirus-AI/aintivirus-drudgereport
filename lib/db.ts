@@ -1,9 +1,16 @@
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import type { Headline, MainHeadlineData, WhitelistUser } from "./types";
 
 // Database path
-const dbPath = path.join(process.cwd(), "data", "headlines.db");
+const dbDir = path.join(process.cwd(), "data");
+const dbPath = path.join(dbDir, "headlines.db");
+
+// Ensure data directory exists
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // Create/open database
 const db = new Database(dbPath);
