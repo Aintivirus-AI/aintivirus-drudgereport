@@ -20,11 +20,10 @@ export default function Home() {
           <div className="border-b border-dark-200/30 py-4">
             <div className="container mx-auto px-4 text-center">
               <h1 className="text-2xl md:text-3xl font-bold tracking-wider">
-                <span className="text-neon-cyan">AINTIVIRUS</span>
-                <span className="content-title-text"> OFF THE GRID</span>
+                <span className="text-neon-cyan">The McAfee Report</span>
               </h1>
               <p className="text-gray-500 text-xs mt-1 tracking-widest uppercase">
-                by $AINTI
+                Powered by AintiVirus
               </p>
             </div>
           </div>
