@@ -1,0 +1,41 @@
+module.exports = {
+  apps: [
+    {
+      name: "aintivirus-web",
+      script: "npm",
+      args: "start",
+      cwd: "/var/www/aintivirus-drudgereport",
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        NODE_ENV: "production",
+        PORT: 3000,
+      },
+      error_file: "/var/log/aintivirus/web-error.log",
+      out_file: "/var/log/aintivirus/web-out.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+    },
+    {
+      name: "aintivirus-bot",
+      script: "npm",
+      args: "run bot",
+      cwd: "/var/www/aintivirus-drudgereport",
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        NODE_ENV: "production",
+      },
+      error_file: "/var/log/aintivirus/bot-error.log",
+      out_file: "/var/log/aintivirus/bot-out.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "500M",
+    },
+  ],
+};
