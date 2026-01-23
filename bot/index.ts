@@ -481,7 +481,42 @@ bot.on("message:text", async (ctx) => {
   const text = ctx.message.text;
   const session = ctx.session;
 
-  // Skip if it's a command
+  // Handle /skip command for subtitle step
+  if (text === "/skip" && session.step === "awaiting_main_subtitle") {
+    const subtitle = undefined;
+    
+    try {
+      const response = await apiRequest("/main-headline", "PUT", {
+        title: session.pendingTitle,
+        url: session.pendingUrl,
+        subtitle,
+        image_url: session.includeImage ? session.pendingImageUrl : undefined,
+      });
+
+      if (response.ok) {
+        await ctx.reply(
+          `✅ *Main headline updated!*\n\n` +
+          `📰 ${session.pendingTitle}\n` +
+          `🔗 ${session.pendingUrl}\n` +
+          `${session.includeImage ? "🖼️ With thumbnail\n" : ""}` +
+          `\nView it at: ${API_URL}`,
+          { parse_mode: "Markdown" }
+        );
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || "Unknown error");
+      }
+    } catch (error) {
+      console.error("Error setting main headline:", error);
+      await ctx.reply("❌ Failed to set main headline. Please try again.");
+    }
+
+    // Reset session
+    resetSession(session);
+    return;
+  }
+
+  // Skip if it's any other command
   if (text.startsWith("/")) {
     return;
   }
