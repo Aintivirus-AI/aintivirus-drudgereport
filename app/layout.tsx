@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "AintiVirus | Off The Grid",
+  title: "The McAfee Report",
   description: "The Drudge Report of Crypto - Real-time news and updates for the crypto community",
   keywords: ["crypto", "cryptocurrency", "news", "bitcoin", "ethereum", "defi", "web3"],
 };
