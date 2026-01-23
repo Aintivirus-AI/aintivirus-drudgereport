@@ -1,6 +1,28 @@
 import { config } from "dotenv";
+import path from "path";
+
 // Load environment variables from .env.local
-config({ path: ".env.local" });
+// Try multiple possible paths
+const envPaths = [
+  path.join(process.cwd(), ".env.local"),
+  path.join(__dirname, "..", ".env.local"),
+  ".env.local",
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  const result = config({ path: envPath });
+  if (!result.error) {
+    envLoaded = true;
+    console.log(`✅ Loaded environment from: ${envPath}`);
+    break;
+  }
+}
+
+if (!envLoaded) {
+  console.warn("⚠️  Could not load .env.local, trying default .env");
+  config(); // Try default .env
+}
 
 import { Bot, Context, session, SessionFlavor, InlineKeyboard } from "grammy";
 import OpenAI from "openai";
