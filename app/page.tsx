@@ -28,10 +28,18 @@ export default function Home() {
               <div className="w-10" /> {/* Spacer for centering */}
               <div className="text-center">
                 <h1 className="text-2xl md:text-3xl font-bold tracking-wider">
-                  <span className="text-neon-cyan">The McAfee Report</span>
+                  <span className="text-neon-cyan">THE MCAFEE REPORT</span>
                 </h1>
-                <p className="text-gray-500 text-xs mt-1 tracking-widest uppercase">
-                  Powered by AintiVirus
+                <p className="text-gray-500 text-xs mt-1 tracking-widest">
+                  Powered by{" "}
+                  <a 
+                    href="https://aintivirus.ai/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-neon-cyan hover:underline"
+                  >
+                    AintiVirus
+                  </a>
                 </p>
               </div>
               <ThemeToggle />

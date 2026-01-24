@@ -3,7 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "The McAfee Report",
+  title: "THE MCAFEE REPORT",
   description: "The Drudge Report of Crypto - Real-time news and updates for the crypto community",
   keywords: ["crypto", "cryptocurrency", "news", "bitcoin", "ethereum", "defi", "web3"],
 };
