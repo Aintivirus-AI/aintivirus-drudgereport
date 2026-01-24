@@ -11,12 +11,12 @@ export default function Home() {
   const rightHeadlines = getHeadlines("right", 15);
   const mainHeadline = getMainHeadline();
   
-  // Get recent headlines for HOT TOPICS (most recent 5 from both columns)
-  const recentLeft = getHeadlines("left", 3);
-  const recentRight = getHeadlines("right", 3);
+  // Get recent headlines for HOT TOPICS (most recent 10 from both columns)
+  const recentLeft = getHeadlines("left", 6);
+  const recentRight = getHeadlines("right", 6);
   const hotTopics = [...recentLeft, ...recentRight]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5);
+    .slice(0, 10);
 
   return (
     <main className="main-content">
@@ -69,7 +69,7 @@ export default function Home() {
                         href={headline.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hot-topic-link text-sm hover:underline font-medium"
+                        className="hot-topic-link text-base hover:underline font-bold"
                         title={headline.title}
                       >
                         {headline.title}
@@ -85,6 +85,11 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Mobile: Divider between hot topics and columns */}
+          <div className="lg:hidden my-8">
+            <hr className="border-t-2 border-neon-cyan/50" />
           </div>
 
           {/* Mobile: Columns after */}
@@ -117,7 +122,7 @@ export default function Home() {
                           href={headline.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hot-topic-link text-sm hover:underline font-medium"
+                          className="hot-topic-link text-base hover:underline font-bold"
                           title={headline.title}
                         >
                           {headline.title}
