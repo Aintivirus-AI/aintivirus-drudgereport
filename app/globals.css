@@ -243,6 +243,21 @@ body {
   text-shadow: 0 0 10px var(--neon-purple), 0 0 20px var(--neon-purple);
 }
 
+/* Hot topic links - black in light mode, white in dark mode */
+.hot-topic-link {
+  color: #000000;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.hot-topic-link:hover {
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .hot-topic-link {
+  color: #ffffff;
+}
+
 /* Main headline glow effect */
 .main-headline {
   animation: headline-glow 3s ease-in-out infinite alternate;

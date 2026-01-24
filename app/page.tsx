@@ -1,5 +1,6 @@
 import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getHeadlines, getMainHeadline } from "@/lib/db";
 
 // Revalidate every 10 seconds
@@ -22,13 +23,19 @@ export default function Home() {
       <div className="grid-bg min-h-screen">
         {/* Page Title */}
         <div className="border-b border-dark-200/30 py-4">
-          <div className="container mx-auto px-4 text-center">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-wider">
-              <span className="text-neon-cyan">The McAfee Report</span>
-            </h1>
-            <p className="text-gray-500 text-xs mt-1 tracking-widest uppercase">
-              Powered by AintiVirus
-            </p>
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between">
+              <div className="w-10" /> {/* Spacer for centering */}
+              <div className="text-center">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-wider">
+                  <span className="text-neon-cyan">The McAfee Report</span>
+                </h1>
+                <p className="text-gray-500 text-xs mt-1 tracking-widest uppercase">
+                  Powered by AintiVirus
+                </p>
+              </div>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
 
@@ -54,7 +61,7 @@ export default function Home() {
                         href={headline.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-black dark:text-black text-sm hover:underline font-medium"
+                        className="hot-topic-link text-sm hover:underline font-medium"
                         title={headline.title}
                       >
                         {headline.title}
@@ -102,7 +109,7 @@ export default function Home() {
                           href={headline.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-black dark:text-black text-sm hover:underline font-medium"
+                          className="hot-topic-link text-sm hover:underline font-medium"
                           title={headline.title}
                         >
                           {headline.title}

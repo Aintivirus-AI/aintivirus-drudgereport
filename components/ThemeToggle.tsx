@@ -45,7 +45,7 @@ const MoonIcon = () => (
 export function ThemeToggle() {
   const { theme, toggleTheme, mounted } = useTheme();
 
-  // Render a placeholder during SSR to prevent hydration mismatch
+  // Render a placeholder during SSR to prevent hydration mismatch (light mode default shows MoonIcon)
   if (!mounted) {
     return (
       <button
