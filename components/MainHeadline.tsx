@@ -27,12 +27,11 @@ export function MainHeadline({ headline }: MainHeadlineProps) {
             alt={headline.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-dark-100 to-transparent" />
         </div>
       )}
       
-      <div className={`p-8 text-center ${headline.image_url ? '-mt-16 relative z-10' : ''}`}>
-        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-neon-cyan group-hover:text-neon-purple transition-colors leading-tight">
+      <div className="p-8 text-center">
+        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-red-600 group-hover:text-red-500 transition-colors leading-tight">
           {headline.title}
         </h2>
         
@@ -41,11 +40,6 @@ export function MainHeadline({ headline }: MainHeadlineProps) {
             {headline.subtitle}
           </p>
         )}
-        
-        <div className="mt-6 flex items-center justify-center gap-2 text-sm text-dark-300">
-          <span className="inline-block w-2 h-2 rounded-full bg-neon-green animate-pulse" />
-          <span>LIVE</span>
-        </div>
       </div>
     </a>
   );

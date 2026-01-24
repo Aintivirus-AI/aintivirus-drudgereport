@@ -97,6 +97,11 @@ function isAuthorized(userId: number): boolean {
   return isAdmin(userId) || isWhitelisted(userId.toString());
 }
 
+// Helper: Escape Markdown special characters
+function escapeMarkdown(text: string): string {
+  return text.replace(/([_*`\[\]])/g, '\\$1');
+}
+
 // Helper: Make API request
 async function apiRequest(
   endpoint: string,
@@ -118,11 +123,71 @@ async function apiRequest(
 }
 
 // Helper: Fetch webpage content including image
-async function fetchPageContent(url: string): Promise<{ title: string; description: string; content: string; imageUrl: string | null }> {
+// Helper: Check if URL is a YouTube link
+function isYouTubeUrl(url: string): boolean {
+  return url.includes("youtube.com") || url.includes("youtu.be");
+}
+
+// Helper: Extract YouTube video ID from URL
+function getYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Helper: Fetch YouTube video info using oEmbed API
+async function fetchYouTubeContent(url: string): Promise<{ title: string; description: string; content: string; imageUrl: string | null }> {
+  const videoId = getYouTubeVideoId(url);
+  
+  try {
+    // Use YouTube oEmbed to get basic info
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const oembedResponse = await fetch(oembedUrl);
+    const oembedData = await oembedResponse.json();
+    
+    // Also fetch the page to get the description
+    const pageResponse = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+    const html = await pageResponse.text();
+    
+    // Extract description from meta tags (YouTube uses og:description)
+    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i) ||
+                        html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+    const description = ogDescMatch ? ogDescMatch[1].trim() : "";
+    
+    // Get thumbnail
+    const imageUrl = videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : oembedData.thumbnail_url || null;
+    
+    return {
+      title: oembedData.title || "",
+      description: description,
+      content: description, // Use description as content for AI to generate headline
+      imageUrl,
+    };
+  } catch (error) {
+    console.error("Error fetching YouTube content:", error);
+    // Fallback to regular page fetch
+    return fetchRegularPageContent(url);
+  }
+}
+
+// Helper: Fetch regular page content
+async function fetchRegularPageContent(url: string): Promise<{ title: string; description: string; content: string; imageUrl: string | null }> {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; AintivirusBot/1.0)",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
     });
     const html = await response.text();
@@ -172,6 +237,14 @@ async function fetchPageContent(url: string): Promise<{ title: string; descripti
     console.error("Error fetching page:", error);
     return { title: "", description: "", content: "", imageUrl: null };
   }
+}
+
+async function fetchPageContent(url: string): Promise<{ title: string; description: string; content: string; imageUrl: string | null }> {
+  // Use YouTube-specific fetching for YouTube URLs
+  if (isYouTubeUrl(url)) {
+    return fetchYouTubeContent(url);
+  }
+  return fetchRegularPageContent(url);
 }
 
 // Helper: Generate headlines using OpenAI
@@ -518,8 +591,8 @@ bot.on("message:text", async (ctx) => {
       if (response.ok) {
         await ctx.reply(
           `✅ *Main headline updated!*\n\n` +
-          `📰 ${session.pendingTitle}\n` +
-          `🔗 ${session.pendingUrl}\n` +
+          `📰 ${escapeMarkdown(session.pendingTitle || "")}\n` +
+          `🔗 ${escapeMarkdown(session.pendingUrl || "")}\n` +
           `${session.includeImage ? "🖼️ With thumbnail\n" : ""}` +
           `\nView it at: ${API_URL}`,
           { parse_mode: "Markdown" }
@@ -898,8 +971,8 @@ bot.on("callback_query:data", async (ctx) => {
         
         await ctx.editMessageText(
           `✅ *Headline added to ${columnLabel} column!*\n\n` +
-          `📰 ${session.pendingTitle}\n` +
-          `🔗 ${session.pendingUrl}\n` +
+          `📰 ${escapeMarkdown(session.pendingTitle || "")}\n` +
+          `🔗 ${escapeMarkdown(session.pendingUrl || "")}\n` +
           `${session.includeImage ? "🖼️ With thumbnail\n" : ""}` +
           `\nID: \`${result.headline.id}\`\n` +
           `View it at: ${API_URL}`,
