@@ -1,6 +1,7 @@
 import type { Headline } from "@/lib/types";
 import { TokenBadge, TokenBadgeCompact } from "./TokenBadge";
 import { ShareButton } from "./ShareButton";
+import { ArticleButton } from "./ArticleButton";
 
 interface HeadlineLinkProps {
   headline: Headline;
@@ -50,6 +51,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                 >
                   {headline.title}
                 </a>
+                <ArticleButton url={articleUrl} />
                 <ShareButton
                   title={headline.title}
                   url={articleUrl}
@@ -84,6 +86,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
       >
         {headline.title}
       </a>
+      <ArticleButton url={articleUrl} />
       <ShareButton
         title={headline.title}
         url={articleUrl}

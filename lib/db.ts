@@ -312,12 +312,14 @@ export function getHeadlineWithDetails(id: number): (Headline & {
   token_image_url?: string;
   submitter_username?: string;
   submission_created_at?: string;
+  cached_content?: string;
 }) | undefined {
   const stmt = db.prepare(`
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       t.ticker, t.pump_url, t.token_name, t.mint_address, t.image_url as token_image_url,
-      s.telegram_username as submitter_username, s.created_at as submission_created_at
+      s.telegram_username as submitter_username, s.created_at as submission_created_at,
+      s.cached_content
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
     LEFT JOIN submissions s ON t.submission_id = s.id
@@ -343,6 +345,7 @@ export function getHeadlineWithDetails(id: number): (Headline & {
     token_image_url: row.token_image_url || undefined,
     submitter_username: row.submitter_username || undefined,
     submission_created_at: row.submission_created_at || undefined,
+    cached_content: row.cached_content || undefined,
   };
 }
 

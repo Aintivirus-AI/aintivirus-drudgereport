@@ -37,6 +37,11 @@ export function TokenTicker() {
           rel="noopener noreferrer"
           className="token-ticker-badge"
         >
+          <img
+            src="/mcafee-logo.png"
+            alt="McAfee Report"
+            className="token-ticker-logo"
+          />
           $NEWS
         </a>
         <span className="token-ticker-ca">

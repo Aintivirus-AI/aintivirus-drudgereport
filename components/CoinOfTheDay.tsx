@@ -12,9 +12,11 @@ export function CoinOfTheDay({ coin }: CoinOfTheDayProps) {
   return (
     <div className="cotd-card mb-6">
       <div className="cotd-header">
+        <div className="cotd-header-deco cotd-header-deco-left" />
         <span className="cotd-star">&#9733;</span>
         <span className="cotd-title">COIN OF THE DAY</span>
         <span className="cotd-star">&#9733;</span>
+        <div className="cotd-header-deco cotd-header-deco-right" />
       </div>
       
       <a

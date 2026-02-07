@@ -957,9 +957,9 @@ export async function fetchPageContent(url: string): Promise<PageContent> {
   return { title: "", description: "", content: "", imageUrl: null };
 }
 
-/** Decode HTML entities. */
+/** Decode HTML entities (named, decimal, and hex). */
 function decodeHtmlEntities(text: string): string {
-  const entities: Record<string, string> = {
+  const namedEntities: Record<string, string> = {
     "&amp;": "&",
     "&lt;": "<",
     "&gt;": ">",
@@ -967,8 +967,38 @@ function decodeHtmlEntities(text: string): string {
     "&#39;": "'",
     "&apos;": "'",
     "&nbsp;": " ",
+    "&mdash;": "—",
+    "&ndash;": "–",
+    "&lsquo;": "\u2018",
+    "&rsquo;": "\u2019",
+    "&ldquo;": "\u201C",
+    "&rdquo;": "\u201D",
+    "&hellip;": "…",
+    "&copy;": "©",
+    "&reg;": "®",
+    "&trade;": "™",
   };
-  return text.replace(/&[^;]+;/g, (match) => entities[match] || match);
+
+  return text.replace(/&[^;]+;/g, (match) => {
+    // Named entity
+    if (namedEntities[match]) return namedEntities[match];
+
+    // Hex numeric entity: &#x27; &#x2019; etc.
+    const hexMatch = match.match(/^&#x([0-9a-fA-F]+);$/);
+    if (hexMatch) {
+      const code = parseInt(hexMatch[1], 16);
+      if (code > 0 && code <= 0x10ffff) return String.fromCodePoint(code);
+    }
+
+    // Decimal numeric entity: &#39; &#8217; etc.
+    const decMatch = match.match(/^&#(\d+);$/);
+    if (decMatch) {
+      const code = parseInt(decMatch[1], 10);
+      if (code > 0 && code <= 0x10ffff) return String.fromCodePoint(code);
+    }
+
+    return match; // Unknown entity — leave as-is
+  });
 }
 
 /** Fetch Twitter/X content using oEmbed + syndication APIs. */

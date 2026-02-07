@@ -2,6 +2,7 @@ import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
 import { CoinOfTheDay } from "@/components/CoinOfTheDay";
 import { TokenTicker } from "@/components/TokenTicker";
+import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getHeadlines, getMainHeadline, getCoinOfTheDay } from "@/lib/db";
 
@@ -48,6 +49,9 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Top coins scrolling ribbon */}
+        <TopCoinsRibbon />
 
         {/* Neon divider */}
         <div className="neon-divider" />

@@ -251,21 +251,39 @@ function isBotGarbageTitle(title: string): boolean {
 }
 
 // Helper: Extract content from HTML (shared between direct fetch and fallbacks)
+/** Decode HTML entities (named, decimal &#39;, and hex &#x27;). */
+function decodeEntities(text: string): string {
+  const named: Record<string, string> = {
+    "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"',
+    "&#39;": "'", "&apos;": "'", "&nbsp;": " ", "&mdash;": "—",
+    "&ndash;": "–", "&lsquo;": "\u2018", "&rsquo;": "\u2019",
+    "&ldquo;": "\u201C", "&rdquo;": "\u201D", "&hellip;": "…",
+  };
+  return text.replace(/&[^;]+;/g, (m) => {
+    if (named[m]) return named[m];
+    const hex = m.match(/^&#x([0-9a-fA-F]+);$/);
+    if (hex) { const c = parseInt(hex[1], 16); if (c > 0 && c <= 0x10ffff) return String.fromCodePoint(c); }
+    const dec = m.match(/^&#(\d+);$/);
+    if (dec) { const c = parseInt(dec[1], 10); if (c > 0 && c <= 0x10ffff) return String.fromCodePoint(c); }
+    return m;
+  });
+}
+
 function extractFromHtml(html: string): { title: string; description: string; content: string; imageUrl: string | null } {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : "";
+  const title = titleMatch ? decodeEntities(titleMatch[1].trim()) : "";
 
   const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
                     html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
-  const description = descMatch ? descMatch[1].trim() : "";
+  const description = descMatch ? decodeEntities(descMatch[1].trim()) : "";
 
   const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
-  const ogTitle = ogTitleMatch ? ogTitleMatch[1].trim() : "";
+  const ogTitle = ogTitleMatch ? decodeEntities(ogTitleMatch[1].trim()) : "";
 
   const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i);
-  const ogDescription = ogDescMatch ? ogDescMatch[1].trim() : "";
+  const ogDescription = ogDescMatch ? decodeEntities(ogDescMatch[1].trim()) : "";
 
   const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);

@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { getHeadlineWithDetails } from "@/lib/db";
 import { TokenBadge } from "@/components/TokenBadge";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { CopyAddressButton } from "@/components/CopyAddressButton";
+import { ListenButton } from "@/components/ListenButton";
 
 export const revalidate = 30;
 
@@ -99,6 +101,37 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </a>
         </div>
 
+        {/* Article Summary */}
+        {(() => {
+          let summary: string | null = null;
+          if (article.cached_content) {
+            try {
+              const parsed = JSON.parse(article.cached_content);
+              // Use description first, fall back to truncated content
+              summary = parsed.description || (parsed.content ? parsed.content.slice(0, 500) : null);
+            } catch {
+              // Invalid JSON — skip
+            }
+          }
+          if (!summary) return null;
+          return (
+            <div className="article-summary mb-8">
+              <div className="article-summary-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-neon-cyan">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="16" y1="13" x2="8" y2="13" strokeLinecap="round"/>
+                  <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round"/>
+                  <line x1="10" y1="9" x2="8" y2="9" strokeLinecap="round"/>
+                </svg>
+                <span className="text-sm font-semibold text-white tracking-wide">SUMMARY</span>
+                <ListenButton text={summary} />
+              </div>
+              <p className="article-summary-text">{summary}</p>
+            </div>
+          );
+        })()}
+
         {/* Token Section */}
         {article.token && (
           <div className="border border-neon-cyan/30 rounded-lg p-6 mb-8 bg-dark-100/50">
@@ -116,14 +149,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 <h2 className="text-xl font-bold text-white">
                   {article.token_name || `$${article.token.ticker}`}
                 </h2>
-                <p className="text-gray-400 text-sm mt-1 font-mono">
-                  ${article.token.ticker}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-gray-400 text-sm font-mono">
+                    ${article.token.ticker}
+                  </span>
                   {article.mint_address && (
-                    <span className="text-gray-600 ml-2">
-                      {article.mint_address.substring(0, 8)}...{article.mint_address.substring(article.mint_address.length - 4)}
-                    </span>
+                    <CopyAddressButton address={article.mint_address} />
                   )}
-                </p>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -133,28 +166,28 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   priceChange={article.token.price_change_24h}
                   size="md"
                 />
-                <a
-                  href={article.token.pump_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30 hover:bg-neon-cyan/30 transition-colors text-sm font-semibold"
-                >
-                  Trade on pump.fun
-                </a>
               </div>
             </div>
 
-            {/* Pump.fun embed iframe */}
+            {/* Pump.fun chart link */}
             {article.mint_address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(article.mint_address) && (
-              <div className="mt-6 rounded-lg overflow-hidden border border-dark-200/30">
-                <iframe
-                  src={`https://pump.fun/coin/${article.mint_address}?embedded=true`}
-                  className="w-full h-[400px] bg-black"
-                  title={`${article.token.ticker} chart`}
-                  sandbox="allow-scripts allow-popups"
-                  loading="lazy"
-                />
-              </div>
+              <a
+                href={`https://pump.fun/coin/${article.mint_address}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 flex items-center justify-center gap-3 rounded-lg border border-dark-200/30 bg-black/40 hover:bg-black/60 hover:border-neon-cyan/30 transition-all py-6 group"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-neon-cyan opacity-70 group-hover:opacity-100 transition-opacity">
+                  <path d="M3 3v18h18" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M7 16l4-8 4 4 5-9" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-gray-400 group-hover:text-white transition-colors text-sm font-medium">
+                  View live chart on pump.fun
+                </span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-gray-600 group-hover:text-neon-cyan transition-colors">
+                  <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
             )}
 
             <p className="text-xs text-gray-500 mt-4">

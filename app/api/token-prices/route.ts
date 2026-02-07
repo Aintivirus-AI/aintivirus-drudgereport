@@ -21,6 +21,8 @@ interface TokenPriceResponse {
   priceChange24h: number;
   marketCap?: number;
   volume24h?: number;
+  imageUrl?: string;
+  pumpUrl?: string;
 }
 
 // LRU-like cache with size limit and TTL eviction
@@ -204,7 +206,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const mintsParam = searchParams.get("mints");
     
-    let tokensToFetch: Array<{ mintAddress: string; ticker: string }> = [];
+    let tokensToFetch: Array<{ mintAddress: string; ticker: string; imageUrl?: string; pumpUrl?: string }> = [];
     
     if (mintsParam) {
       // Fetch specific tokens — validate format and limit count
@@ -223,6 +225,8 @@ export async function GET(request: NextRequest) {
         .map(t => ({
           mintAddress: t.mint_address!,
           ticker: t.ticker,
+          imageUrl: t.image_url || undefined,
+          pumpUrl: t.pump_url || undefined,
         }));
     }
 
@@ -234,7 +238,7 @@ export async function GET(request: NextRequest) {
       const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
       
       const batchResults = await Promise.all(
-        batch.map(async ({ mintAddress, ticker }) => {
+        batch.map(async ({ mintAddress, ticker, imageUrl, pumpUrl }) => {
           const price = await getTokenPrice(mintAddress);
           
           if (price) {
@@ -245,6 +249,8 @@ export async function GET(request: NextRequest) {
               priceChange24h: price.priceChange24h,
               marketCap: price.marketCap,
               volume24h: price.volume24h,
+              imageUrl,
+              pumpUrl,
             };
           }
           

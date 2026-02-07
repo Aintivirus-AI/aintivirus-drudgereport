@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useCallback } from "react";
+import { useSyncExternalStore } from "react";
 
 interface TokenPrice {
   mintAddress: string;
@@ -9,6 +9,8 @@ interface TokenPrice {
   priceChange24h: number;
   marketCap?: number;
   volume24h?: number;
+  imageUrl?: string;
+  pumpUrl?: string;
 }
 
 interface TokenPriceMap {
@@ -103,8 +105,11 @@ function getSnapshot(): TokenPriceMap {
 }
 
 // useSyncExternalStore API: getServerSnapshot function (for SSR)
+// IMPORTANT: Must return the SAME reference every call — React checks with ===.
+// Returning a new `{}` each time causes "getServerSnapshot not consistent" error.
+const EMPTY_PRICES: TokenPriceMap = {};
 function getServerSnapshot(): TokenPriceMap {
-  return {};
+  return EMPTY_PRICES;
 }
 
 /**
