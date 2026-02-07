@@ -1,7 +1,19 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import type { Headline, MainHeadlineData, WhitelistUser } from "./types";
+import { VALID_STATUS_TRANSITIONS } from "./types";
+import type { 
+  Headline, 
+  MainHeadlineData, 
+  CoinOfTheDayData,
+  WhitelistUser,
+  Submission,
+  SubmissionStatus,
+  ContentType,
+  Token,
+  RevenueEvent,
+  RevenueStatus
+} from "./types";
 
 // Database path
 const dbDir = path.join(process.cwd(), "data");
@@ -40,6 +52,16 @@ db.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- Coin of the day (single row, updated in place)
+  CREATE TABLE IF NOT EXISTS coin_of_the_day (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   -- Whitelist table for Telegram users
   CREATE TABLE IF NOT EXISTS whitelist (
     telegram_id TEXT PRIMARY KEY,
@@ -47,9 +69,61 @@ db.exec(`
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- User submissions queue
+  CREATE TABLE IF NOT EXISTS submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_user_id TEXT NOT NULL,
+    telegram_username TEXT,
+    sol_address TEXT NOT NULL,
+    url TEXT NOT NULL,
+    content_type TEXT DEFAULT 'other' CHECK(content_type IN ('article', 'tweet', 'youtube', 'tiktok', 'other')),
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'validating', 'approved', 'rejected', 'published')),
+    rejection_reason TEXT,
+    content_hash TEXT,
+    embedding TEXT,
+    cached_content TEXT,
+    published_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Token tracking
+  CREATE TABLE IF NOT EXISTS tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    headline_id INTEGER REFERENCES headlines(id),
+    submission_id INTEGER REFERENCES submissions(id),
+    token_name TEXT NOT NULL,
+    ticker TEXT NOT NULL,
+    image_url TEXT,
+    mint_address TEXT,
+    pump_url TEXT,
+    deployer_sol_address TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Revenue tracking
+  CREATE TABLE IF NOT EXISTS revenue_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    amount_lamports INTEGER NOT NULL,
+    submitter_share_lamports INTEGER NOT NULL,
+    burn_share_lamports INTEGER NOT NULL,
+    submitter_tx_signature TEXT,
+    burn_tx_signature TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'submitter_paid', 'burned', 'completed', 'failed')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   -- Create indexes for better query performance
   CREATE INDEX IF NOT EXISTS idx_headlines_column ON headlines(column);
   CREATE INDEX IF NOT EXISTS idx_headlines_created_at ON headlines(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+  CREATE INDEX IF NOT EXISTS idx_submissions_created_at ON submissions(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_submissions_url ON submissions(url);
+  CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions(telegram_user_id);
+  CREATE INDEX IF NOT EXISTS idx_tokens_headline_id ON tokens(headline_id);
+  CREATE INDEX IF NOT EXISTS idx_tokens_submission_id ON tokens(submission_id);
+  CREATE INDEX IF NOT EXISTS idx_revenue_events_token_id ON revenue_events(token_id);
+  CREATE INDEX IF NOT EXISTS idx_revenue_events_status ON revenue_events(status);
 `);
 
 // Migration: Add image_url column if it doesn't exist
@@ -60,6 +134,18 @@ try {
 }
 try {
   db.exec(`ALTER TABLE main_headline ADD COLUMN image_url TEXT`);
+} catch {
+  // Column already exists
+}
+// Migration: Add token_id to headlines
+try {
+  db.exec(`ALTER TABLE headlines ADD COLUMN token_id INTEGER REFERENCES tokens(id)`);
+} catch {
+  // Column already exists
+}
+// Migration: Add cached_content to submissions
+try {
+  db.exec(`ALTER TABLE submissions ADD COLUMN cached_content TEXT`);
 } catch {
   // Column already exists
 }
@@ -83,32 +169,80 @@ if (mainHeadlineExists.count === 0) {
 
 /**
  * Get headlines for a specific column, ordered by newest first (FIFO display)
+ * Includes token data if available
  */
 export function getHeadlines(
   column: "left" | "right" | "center",
   limit: number = 25
 ): Headline[] {
   const stmt = db.prepare(`
-    SELECT id, title, url, column, image_url, created_at
-    FROM headlines
-    WHERE column = ?
-    ORDER BY created_at DESC
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      t.ticker, t.pump_url
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    WHERE h.column = ?
+    ORDER BY h.created_at DESC
     LIMIT ?
   `);
-  return stmt.all(column, limit) as Headline[];
+  const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string }>;
+  
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || ""
+    } : undefined
+  }));
 }
 
 /**
  * Get all headlines across all columns
+ * Includes token data if available
  */
 export function getAllHeadlines(limit: number = 100): Headline[] {
   const stmt = db.prepare(`
-    SELECT id, title, url, column, image_url, created_at
-    FROM headlines
-    ORDER BY created_at DESC
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      t.ticker, t.pump_url
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    ORDER BY h.created_at DESC
     LIMIT ?
   `);
-  return stmt.all(limit) as Headline[];
+  const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string }>;
+  
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || ""
+    } : undefined
+  }));
+}
+
+/**
+ * Get recent headline titles (for duplicate detection against published stories).
+ */
+export function getRecentHeadlineTitles(hours: number = 24): { id: number; title: string }[] {
+  const stmt = db.prepare(`
+    SELECT id, title FROM headlines
+    WHERE created_at > datetime('now', '-' || ? || ' hours')
+    ORDER BY created_at DESC
+  `);
+  return stmt.all(hours) as { id: number; title: string }[];
 }
 
 /**
@@ -118,14 +252,15 @@ export function addHeadline(
   title: string,
   url: string,
   column: "left" | "right" = "left",
-  imageUrl?: string
+  imageUrl?: string,
+  tokenId?: number
 ): Headline {
   const stmt = db.prepare(`
-    INSERT INTO headlines (title, url, column, image_url)
-    VALUES (?, ?, ?, ?)
-    RETURNING id, title, url, column, image_url, created_at
+    INSERT INTO headlines (title, url, column, image_url, token_id)
+    VALUES (?, ?, ?, ?, ?)
+    RETURNING id, title, url, column, image_url, token_id, created_at
   `);
-  return stmt.get(title, url, column, imageUrl || null) as Headline;
+  return stmt.get(title, url, column, imageUrl || null, tokenId || null) as Headline;
 }
 
 /**
@@ -142,11 +277,73 @@ export function removeHeadline(id: number): boolean {
  */
 export function getHeadlineById(id: number): Headline | undefined {
   const stmt = db.prepare(`
-    SELECT id, title, url, column, image_url, created_at
-    FROM headlines
-    WHERE id = ?
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      t.ticker, t.pump_url
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    WHERE h.id = ?
   `);
-  return stmt.get(id) as Headline | undefined;
+  const row = stmt.get(id) as (Headline & { ticker?: string; pump_url?: string }) | undefined;
+  
+  if (!row) return undefined;
+  
+  return {
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || ""
+    } : undefined
+  };
+}
+
+/**
+ * Get a headline with full token and submission data (for article pages)
+ */
+export function getHeadlineWithDetails(id: number): (Headline & {
+  token_name?: string;
+  mint_address?: string;
+  token_image_url?: string;
+  submitter_username?: string;
+  submission_created_at?: string;
+}) | undefined {
+  const stmt = db.prepare(`
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      t.ticker, t.pump_url, t.token_name, t.mint_address, t.image_url as token_image_url,
+      s.telegram_username as submitter_username, s.created_at as submission_created_at
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    LEFT JOIN submissions s ON t.submission_id = s.id
+    WHERE h.id = ?
+  `);
+  const row = stmt.get(id) as any;
+  if (!row) return undefined;
+  
+  return {
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || ""
+    } : undefined,
+    token_name: row.token_name || undefined,
+    mint_address: row.mint_address || undefined,
+    token_image_url: row.token_image_url || undefined,
+    submitter_username: row.submitter_username || undefined,
+    submission_created_at: row.submission_created_at || undefined,
+  };
 }
 
 // ============= MAIN HEADLINE =============
@@ -179,6 +376,44 @@ export function setMainHeadline(
     RETURNING id, title, url, subtitle, image_url, updated_at
   `);
   return stmt.get(title, url, subtitle || null, imageUrl || null) as MainHeadlineData;
+}
+
+// ============= COIN OF THE DAY =============
+
+/**
+ * Get the coin of the day
+ */
+export function getCoinOfTheDay(): CoinOfTheDayData | null {
+  const stmt = db.prepare(`
+    SELECT id, title, url, description, image_url, updated_at
+    FROM coin_of_the_day
+    WHERE id = 1
+  `);
+  return (stmt.get() as CoinOfTheDayData) || null;
+}
+
+/**
+ * Set / update the coin of the day
+ */
+export function setCoinOfTheDay(
+  title: string,
+  url: string,
+  description?: string,
+  imageUrl?: string
+): CoinOfTheDayData {
+  // Upsert: insert or replace the single row
+  const stmt = db.prepare(`
+    INSERT INTO coin_of_the_day (id, title, url, description, image_url, updated_at)
+    VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      title = excluded.title,
+      url = excluded.url,
+      description = excluded.description,
+      image_url = excluded.image_url,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING id, title, url, description, image_url, updated_at
+  `);
+  return stmt.get(title, url, description || null, imageUrl || null) as CoinOfTheDayData;
 }
 
 // ============= WHITELIST =============
@@ -230,6 +465,491 @@ export function getWhitelist(): WhitelistUser[] {
   return stmt.all() as WhitelistUser[];
 }
 
+// ============= SUBMISSIONS CRUD =============
+
+/**
+ * Create a new submission
+ */
+export function createSubmission(
+  telegramUserId: string,
+  solAddress: string,
+  url: string,
+  contentType: ContentType = "other",
+  telegramUsername?: string
+): Submission {
+  const stmt = db.prepare(`
+    INSERT INTO submissions (telegram_user_id, telegram_username, sol_address, url, content_type)
+    VALUES (?, ?, ?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(telegramUserId, telegramUsername || null, solAddress, url, contentType) as Submission;
+}
+
+/**
+ * Get a submission by ID
+ */
+export function getSubmissionById(id: number): Submission | undefined {
+  const stmt = db.prepare(`SELECT * FROM submissions WHERE id = ?`);
+  return stmt.get(id) as Submission | undefined;
+}
+
+/**
+ * Get submissions by status
+ */
+export function getSubmissionsByStatus(status: SubmissionStatus, limit: number = 50): Submission[] {
+  const stmt = db.prepare(`
+    SELECT * FROM submissions 
+    WHERE status = ? 
+    ORDER BY created_at ASC 
+    LIMIT ?
+  `);
+  return stmt.all(status, limit) as Submission[];
+}
+
+/**
+ * Get pending submissions count
+ */
+export function getPendingSubmissionsCount(): number {
+  const stmt = db.prepare(`SELECT COUNT(*) as count FROM submissions WHERE status = 'pending'`);
+  const result = stmt.get() as { count: number };
+  return result.count;
+}
+
+/**
+ * Get submission count by status (efficient COUNT query).
+ */
+export function getSubmissionCountByStatus(status: SubmissionStatus): number {
+  const stmt = db.prepare(`SELECT COUNT(*) as count FROM submissions WHERE status = ?`);
+  const result = stmt.get(status) as { count: number };
+  return result.count;
+}
+
+/**
+ * Update submission status.
+ * Uses optimistic locking (WHERE status = currentStatus) to prevent TOCTOU race conditions.
+ * Returns false if the row was concurrently modified (status already changed).
+ */
+export function updateSubmissionStatus(
+  id: number,
+  newStatus: SubmissionStatus,
+  rejectionReason?: string
+): boolean {
+  // Determine valid source states for this transition
+  const validSourceStates = Object.entries(VALID_STATUS_TRANSITIONS)
+    .filter(([, targets]) => targets.includes(newStatus))
+    .map(([source]) => source);
+
+  if (validSourceStates.length === 0) {
+    throw new Error(`No valid source states can transition to '${newStatus}'`);
+  }
+
+  // Atomic optimistic locking: UPDATE only if the current status allows this transition.
+  // This prevents two concurrent processes from both reading "pending" and both writing "validating".
+  const placeholders = validSourceStates.map(() => "?").join(", ");
+  const stmt = db.prepare(`
+    UPDATE submissions 
+    SET status = ?, rejection_reason = COALESCE(?, rejection_reason)
+    WHERE id = ? AND status IN (${placeholders})
+  `);
+  const result = stmt.run(newStatus, rejectionReason || null, id, ...validSourceStates);
+  return result.changes > 0;
+}
+
+/**
+ * Update submission content hash and embedding
+ */
+export function updateSubmissionContentHash(
+  id: number,
+  contentHash: string,
+  embedding?: number[]
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE submissions 
+    SET content_hash = ?, embedding = ?
+    WHERE id = ?
+  `);
+  const embeddingJson = embedding ? JSON.stringify(embedding) : null;
+  const result = stmt.run(contentHash, embeddingJson, id);
+  return result.changes > 0;
+}
+
+/**
+ * Update submission cached content (JSON-serialised PageContent).
+ */
+export function updateSubmissionCachedContent(
+  id: number,
+  cachedContent: string
+): boolean {
+  const stmt = db.prepare(`UPDATE submissions SET cached_content = ? WHERE id = ?`);
+  const result = stmt.run(cachedContent, id);
+  return result.changes > 0;
+}
+
+/**
+ * Mark submission as published.
+ * Uses optimistic locking — only succeeds if the submission is currently 'approved'.
+ */
+export function markSubmissionPublished(id: number): boolean {
+  const stmt = db.prepare(`
+    UPDATE submissions 
+    SET status = 'published', published_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND status = 'approved'
+  `);
+  const result = stmt.run(id);
+
+  if (result.changes === 0) {
+    const current = getSubmissionById(id);
+    if (current && current.status !== "approved") {
+      throw new Error(
+        `Cannot publish: submission #${id} is '${current.status}', must be 'approved'`
+      );
+    }
+  }
+
+  return result.changes > 0;
+}
+
+/**
+ * Get recent submissions for duplicate detection
+ */
+export function getRecentSubmissionsForDuplicateCheck(days: number = 7): Submission[] {
+  const stmt = db.prepare(`
+    SELECT * FROM submissions 
+    WHERE created_at > datetime('now', '-' || ? || ' days')
+    AND status NOT IN ('rejected')
+    ORDER BY created_at DESC
+  `);
+  return stmt.all(days) as Submission[];
+}
+
+/**
+ * Get submissions by telegram user
+ */
+export function getSubmissionsByUser(telegramUserId: string, limit: number = 20): Submission[] {
+  const stmt = db.prepare(`
+    SELECT * FROM submissions 
+    WHERE telegram_user_id = ? 
+    ORDER BY created_at DESC 
+    LIMIT ?
+  `);
+  return stmt.all(telegramUserId, limit) as Submission[];
+}
+
+/**
+ * Count published articles today
+ */
+export function getPublishedTodayCount(): number {
+  const stmt = db.prepare(`
+    SELECT COUNT(*) as count FROM submissions 
+    WHERE status = 'published' 
+    AND date(published_at) = date('now')
+  `);
+  const result = stmt.get() as { count: number };
+  return result.count;
+}
+
+/**
+ * Get recent submission count by user (for rate limiting).
+ */
+export function getRecentSubmissionCountByUser(
+  telegramUserId: string,
+  hours: number = 1
+): number {
+  const stmt = db.prepare(`
+    SELECT COUNT(*) as count FROM submissions 
+    WHERE telegram_user_id = ? 
+    AND created_at > datetime('now', '-' || ? || ' hours')
+  `);
+  const result = stmt.get(telegramUserId, hours) as { count: number };
+  return result.count;
+}
+
+/**
+ * Check if a URL was recently submitted (for duplicate URL detection at submission time).
+ */
+export function getRecentSubmissionByUrl(
+  url: string,
+  hours: number = 48
+): Submission | undefined {
+  const stmt = db.prepare(`
+    SELECT * FROM submissions 
+    WHERE url = ? 
+    AND created_at > datetime('now', '-' || ? || ' hours')
+    AND status NOT IN ('rejected')
+    LIMIT 1
+  `);
+  return stmt.get(url, hours) as Submission | undefined;
+}
+
+/**
+ * Get top submitters by published article count (for leaderboard).
+ */
+export function getTopSubmitters(limit: number = 20): Array<{
+  telegram_username: string | null;
+  telegram_user_id: string;
+  published_count: number;
+  total_submissions: number;
+}> {
+  const stmt = db.prepare(`
+    SELECT 
+      telegram_username,
+      telegram_user_id,
+      SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published_count,
+      COUNT(*) as total_submissions
+    FROM submissions
+    GROUP BY telegram_user_id
+    HAVING published_count > 0
+    ORDER BY published_count DESC
+    LIMIT ?
+  `);
+  return stmt.all(limit) as Array<{
+    telegram_username: string | null;
+    telegram_user_id: string;
+    published_count: number;
+    total_submissions: number;
+  }>;
+}
+
+/**
+ * Get recent token launches with headline data (for leaderboard).
+ */
+export function getRecentTokenLaunches(limit: number = 20): Array<{
+  token_id: number;
+  token_name: string;
+  ticker: string;
+  mint_address: string | null;
+  pump_url: string | null;
+  token_image_url: string | null;
+  headline_title: string;
+  headline_id: number;
+  created_at: string;
+}> {
+  const stmt = db.prepare(`
+    SELECT 
+      t.id as token_id,
+      t.token_name,
+      t.ticker,
+      t.mint_address,
+      t.pump_url,
+      t.image_url as token_image_url,
+      h.title as headline_title,
+      h.id as headline_id,
+      t.created_at
+    FROM tokens t
+    LEFT JOIN headlines h ON t.headline_id = h.id
+    WHERE t.mint_address IS NOT NULL
+    ORDER BY t.created_at DESC
+    LIMIT ?
+  `);
+  return stmt.all(limit) as Array<{
+    token_id: number;
+    token_name: string;
+    ticker: string;
+    mint_address: string | null;
+    pump_url: string | null;
+    token_image_url: string | null;
+    headline_title: string;
+    headline_id: number;
+    created_at: string;
+  }>;
+}
+
+// ============= TOKENS CRUD =============
+
+/**
+ * Create a new token
+ */
+export function createToken(
+  tokenName: string,
+  ticker: string,
+  deployerSolAddress: string,
+  headlineId?: number,
+  submissionId?: number,
+  imageUrl?: string,
+  mintAddress?: string,
+  pumpUrl?: string
+): Token {
+  const stmt = db.prepare(`
+    INSERT INTO tokens (headline_id, submission_id, token_name, ticker, image_url, mint_address, pump_url, deployer_sol_address)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(
+    headlineId || null,
+    submissionId || null,
+    tokenName,
+    ticker,
+    imageUrl || null,
+    mintAddress || null,
+    pumpUrl || null,
+    deployerSolAddress
+  ) as Token;
+}
+
+/**
+ * Get token by ID
+ */
+export function getTokenById(id: number): Token | undefined {
+  const stmt = db.prepare(`SELECT * FROM tokens WHERE id = ?`);
+  return stmt.get(id) as Token | undefined;
+}
+
+/**
+ * Get token by headline ID
+ */
+export function getTokenByHeadlineId(headlineId: number): Token | undefined {
+  const stmt = db.prepare(`SELECT * FROM tokens WHERE headline_id = ?`);
+  return stmt.get(headlineId) as Token | undefined;
+}
+
+/**
+ * Get token by mint address
+ */
+export function getTokenByMintAddress(mintAddress: string): Token | undefined {
+  const stmt = db.prepare(`SELECT * FROM tokens WHERE mint_address = ?`);
+  return stmt.get(mintAddress) as Token | undefined;
+}
+
+/**
+ * Update token with deployment info
+ */
+export function updateTokenDeployment(
+  id: number,
+  mintAddress: string,
+  pumpUrl: string
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE tokens 
+    SET mint_address = ?, pump_url = ?
+    WHERE id = ?
+  `);
+  const result = stmt.run(mintAddress, pumpUrl, id);
+  return result.changes > 0;
+}
+
+/**
+ * Link token to headline
+ */
+export function linkTokenToHeadline(tokenId: number, headlineId: number): boolean {
+  // Update token's headline_id
+  const stmt1 = db.prepare(`UPDATE tokens SET headline_id = ? WHERE id = ?`);
+  stmt1.run(headlineId, tokenId);
+  
+  // Update headline's token_id
+  const stmt2 = db.prepare(`UPDATE headlines SET token_id = ? WHERE id = ?`);
+  const result = stmt2.run(tokenId, headlineId);
+  return result.changes > 0;
+}
+
+/**
+ * Get all tokens
+ */
+export function getAllTokens(limit: number = 100): Token[] {
+  const stmt = db.prepare(`
+    SELECT * FROM tokens 
+    ORDER BY created_at DESC 
+    LIMIT ?
+  `);
+  return stmt.all(limit) as Token[];
+}
+
+/**
+ * Check if ticker already exists
+ */
+export function tickerExists(ticker: string): boolean {
+  const stmt = db.prepare(`SELECT COUNT(*) as count FROM tokens WHERE ticker = ?`);
+  const result = stmt.get(ticker) as { count: number };
+  return result.count > 0;
+}
+
+// ============= REVENUE EVENTS CRUD =============
+
+// Revenue split — single source of truth (configurable via env)
+const SUBMITTER_SHARE_PERCENT = parseFloat(process.env.REVENUE_SUBMITTER_SHARE || "0.5");
+
+/**
+ * Create a new revenue event
+ */
+export function createRevenueEvent(
+  tokenId: number,
+  amountLamports: number
+): RevenueEvent {
+  const submitterShare = Math.floor(amountLamports * SUBMITTER_SHARE_PERCENT);
+  const burnShare = amountLamports - submitterShare;
+  
+  const stmt = db.prepare(`
+    INSERT INTO revenue_events (token_id, amount_lamports, submitter_share_lamports, burn_share_lamports)
+    VALUES (?, ?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(tokenId, amountLamports, submitterShare, burnShare) as RevenueEvent;
+}
+
+/**
+ * Get revenue event by ID
+ */
+export function getRevenueEventById(id: number): RevenueEvent | undefined {
+  const stmt = db.prepare(`SELECT * FROM revenue_events WHERE id = ?`);
+  return stmt.get(id) as RevenueEvent | undefined;
+}
+
+/**
+ * Get pending revenue events
+ */
+export function getPendingRevenueEvents(limit: number = 50): RevenueEvent[] {
+  const stmt = db.prepare(`
+    SELECT * FROM revenue_events 
+    WHERE status = 'pending' 
+    ORDER BY created_at ASC 
+    LIMIT ?
+  `);
+  return stmt.all(limit) as RevenueEvent[];
+}
+
+/**
+ * Update revenue event status
+ */
+export function updateRevenueEventStatus(
+  id: number,
+  status: RevenueStatus,
+  submitterTxSignature?: string,
+  burnTxSignature?: string
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE revenue_events 
+    SET status = ?, submitter_tx_signature = COALESCE(?, submitter_tx_signature), burn_tx_signature = COALESCE(?, burn_tx_signature)
+    WHERE id = ?
+  `);
+  const result = stmt.run(status, submitterTxSignature || null, burnTxSignature || null, id);
+  return result.changes > 0;
+}
+
+/**
+ * Get revenue events by token
+ */
+export function getRevenueEventsByToken(tokenId: number): RevenueEvent[] {
+  const stmt = db.prepare(`
+    SELECT * FROM revenue_events 
+    WHERE token_id = ? 
+    ORDER BY created_at DESC
+  `);
+  return stmt.all(tokenId) as RevenueEvent[];
+}
+
+/**
+ * Get total revenue stats
+ */
+export function getRevenueStats(): { total: number; distributed: number; burned: number } {
+  const stmt = db.prepare(`
+    SELECT 
+      COALESCE(SUM(amount_lamports), 0) as total,
+      COALESCE(SUM(CASE WHEN status IN ('submitter_paid', 'completed') THEN submitter_share_lamports ELSE 0 END), 0) as distributed,
+      COALESCE(SUM(CASE WHEN status IN ('burned', 'completed') THEN burn_share_lamports ELSE 0 END), 0) as burned
+    FROM revenue_events
+  `);
+  return stmt.get() as { total: number; distributed: number; burned: number };
+}
+
 // ============= UTILITY =============
 
 /**
@@ -251,6 +971,25 @@ export function cleanupOldHeadlines(keepCount: number = 100): number {
   `);
   const result = stmt.run(keepCount, keepCount, keepCount);
   return result.changes;
+}
+
+/**
+ * Detect content type from URL
+ */
+export function detectContentType(url: string): ContentType {
+  const lowerUrl = url.toLowerCase();
+  
+  if (lowerUrl.includes("twitter.com") || lowerUrl.includes("x.com")) {
+    return "tweet";
+  }
+  if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) {
+    return "youtube";
+  }
+  if (lowerUrl.includes("tiktok.com")) {
+    return "tiktok";
+  }
+  
+  return "article";
 }
 
 export default db;

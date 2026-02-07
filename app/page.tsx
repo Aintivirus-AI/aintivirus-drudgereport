@@ -1,7 +1,9 @@
 import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
+import { CoinOfTheDay } from "@/components/CoinOfTheDay";
+import { TokenTicker } from "@/components/TokenTicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getHeadlines, getMainHeadline } from "@/lib/db";
+import { getHeadlines, getMainHeadline, getCoinOfTheDay } from "@/lib/db";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -10,11 +12,10 @@ export default function Home() {
   const leftHeadlines = getHeadlines("left", 15);
   const rightHeadlines = getHeadlines("right", 15);
   const mainHeadline = getMainHeadline();
+  const coinOfTheDay = getCoinOfTheDay();
   
-  // Get recent headlines for HOT TOPICS (most recent 10 from both columns)
-  const recentLeft = getHeadlines("left", 6);
-  const recentRight = getHeadlines("right", 6);
-  const hotTopics = [...recentLeft, ...recentRight]
+  // Derive HOT TOPICS from already-fetched headlines (no duplicate queries)
+  const hotTopics = [...leftHeadlines.slice(0, 6), ...rightHeadlines.slice(0, 6)]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 10);
 
@@ -41,9 +42,7 @@ export default function Home() {
                     AintiVirus
                   </a>
                 </p>
-                <p className="text-gray-500 text-xs mt-1 font-mono">
-                  CA: <span className="select-all">7Epmyp9dMD5SzUtxczbuWwsVARyWdzLFAkzxnvZWpump</span>
-                </p>
+                <TokenTicker />
               </div>
               <ThemeToggle />
             </div>
@@ -93,6 +92,11 @@ export default function Home() {
           {/* Mobile: Divider between hot topics and columns */}
           <div className="lg:hidden my-8">
             <hr className="border-t-2 border-neon-cyan/50" />
+          </div>
+
+          {/* Mobile: Coin of the Day */}
+          <div className="lg:hidden mb-6">
+            <CoinOfTheDay coin={coinOfTheDay} />
           </div>
 
           {/* Mobile: Columns after */}
@@ -145,6 +149,7 @@ export default function Home() {
 
             {/* Right Column */}
             <div className="lg:col-span-1">
+              <CoinOfTheDay coin={coinOfTheDay} />
               <HeadlineColumn headlines={rightHeadlines} />
             </div>
           </div>

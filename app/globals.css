@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+/* Fonts are self-hosted via next/font in layout.tsx (GDPR-safe, no user data sent to Google) */
 
 /* Global theme - always dark for nav/header/footer */
 :root {
@@ -1122,3 +1122,330 @@ body.nav-no-scroll {
     width: 14px;
   }
 }
+
+/* ============= TOKEN TICKER BAR ============= */
+.token-ticker {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.token-ticker-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  background: rgba(0, 255, 255, 0.05);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.token-ticker-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.25), rgba(168, 85, 247, 0.25));
+  color: #00ffff;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+.token-ticker-badge:hover {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.4), rgba(168, 85, 247, 0.4));
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
+}
+
+.token-ticker-ca {
+  color: rgba(255, 255, 255, 0.6);
+  user-select: all;
+}
+
+.token-ticker-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.token-ticker-copy:hover {
+  background: rgba(0, 255, 255, 0.15);
+  color: #00ffff;
+}
+
+.token-ticker-buy {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #00ff88, #00cc6a);
+  color: #000;
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.token-ticker-buy:hover {
+  background: linear-gradient(135deg, #33ff99, #00ff88);
+  box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
+  transform: scale(1.05);
+}
+
+/* Light theme overrides */
+:root[data-theme="light"] .token-ticker-inner {
+  border-color: rgba(0, 150, 150, 0.3);
+  background: rgba(0, 150, 150, 0.06);
+}
+
+:root[data-theme="light"] .token-ticker-badge {
+  background: linear-gradient(135deg, rgba(0, 150, 150, 0.2), rgba(120, 60, 200, 0.15));
+  color: #007777;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .token-ticker-ca {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="light"] .token-ticker-copy {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="light"] .token-ticker-copy:hover {
+  background: rgba(0, 150, 150, 0.15);
+  color: #007777;
+}
+
+/* ============= TOKEN BADGE ============= */
+.token-badge-up {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.token-badge-up:hover {
+  background: rgba(34, 197, 94, 0.3);
+}
+.token-badge-down {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.token-badge-down:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+.token-badge-neutral {
+  background: rgba(6, 182, 212, 0.2);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+.token-badge-neutral:hover {
+  background: rgba(6, 182, 212, 0.3);
+}
+.token-badge-arrow-up {
+  color: #4ade80;
+}
+.token-badge-arrow-down {
+  color: #f87171;
+}
+.token-badge-compact {
+  background: rgba(6, 182, 212, 0.2);
+  color: #22d3ee;
+}
+.token-badge-compact:hover {
+  background: rgba(6, 182, 212, 0.3);
+}
+
+/* Light theme overrides for token badges */
+:root[data-theme="light"] .token-badge-up {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.3);
+}
+:root[data-theme="light"] .token-badge-up:hover {
+  background: rgba(22, 163, 74, 0.2);
+}
+:root[data-theme="light"] .token-badge-down {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+:root[data-theme="light"] .token-badge-down:hover {
+  background: rgba(220, 38, 38, 0.18);
+}
+:root[data-theme="light"] .token-badge-neutral {
+  background: rgba(14, 116, 144, 0.1);
+  color: #0e7490;
+  border-color: rgba(14, 116, 144, 0.3);
+}
+:root[data-theme="light"] .token-badge-neutral:hover {
+  background: rgba(14, 116, 144, 0.18);
+}
+:root[data-theme="light"] .token-badge-arrow-up {
+  color: #16a34a;
+}
+:root[data-theme="light"] .token-badge-arrow-down {
+  color: #dc2626;
+}
+:root[data-theme="light"] .token-badge-compact {
+  background: rgba(14, 116, 144, 0.1);
+  color: #0e7490;
+}
+:root[data-theme="light"] .token-badge-compact:hover {
+  background: rgba(14, 116, 144, 0.18);
+}
+
+/* ============= COIN OF THE DAY ============= */
+.cotd-card {
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: rgba(10, 10, 15, 0.8);
+  position: relative;
+}
+
+.cotd-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.4), rgba(0, 255, 255, 0.2), rgba(255, 215, 0, 0.4));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.cotd-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.cotd-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.cotd-star {
+  color: #ffd700;
+  font-size: 0.65rem;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+}
+
+.cotd-link {
+  display: block;
+  text-decoration: none;
+  transition: background 0.3s ease;
+}
+
+.cotd-link:hover {
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.cotd-image-wrapper {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.cotd-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cotd-content {
+  padding: 0.75rem 1rem;
+  text-align: center;
+}
+
+.cotd-coin-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffd700;
+  line-height: 1.3;
+  transition: color 0.2s ease;
+}
+
+.cotd-link:hover .cotd-coin-name {
+  color: #ffe44d;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+
+.cotd-description {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+/* Light theme override */
+:root[data-theme="light"] .cotd-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(180, 140, 0, 0.3);
+}
+
+:root[data-theme="light"] .cotd-header {
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.15), transparent);
+  border-bottom-color: rgba(180, 140, 0, 0.2);
+}
+
+:root[data-theme="light"] .cotd-title {
+  color: #b8860b;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .cotd-star {
+  color: #b8860b;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .cotd-coin-name {
+  color: #8b6914;
+}
+
+:root[data-theme="light"] .cotd-link:hover .cotd-coin-name {
+  color: #6b4f0a;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .cotd-description {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* ============= TOKEN PRICE FLASH ANIMATIONS ============= */
+@keyframes flash-green {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+  50% { box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.4); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+@keyframes flash-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  50% { box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.4); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.animate-flash-green { animation: flash-green 1.2s ease-out; }
+.animate-flash-red { animation: flash-red 1.2s ease-out; }

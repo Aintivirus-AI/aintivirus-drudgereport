@@ -2,20 +2,28 @@
   "name": "aintivirus-drudgereport",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:server": "NODE_OPTIONS=--max-old-space-size=2048 next build",
     "start": "next start",
     "lint": "next lint",
-    "bot": "npx tsx bot/index.ts",
-    "bot:dev": "npx tsx watch bot/index.ts"
+    "bot": "tsx bot/index.ts",
+    "bot:dev": "tsx watch bot/index.ts",
+    "scheduler": "tsx worker/scheduler.ts",
+    "scheduler:dev": "tsx watch worker/scheduler.ts"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
     "better-sqlite3": "^11.7.0",
+    "bs58": "^6.0.0",
     "dotenv": "^17.2.3",
     "grammy": "^1.31.0",
     "next": "^15.1.0",
+    "node-cron": "^3.0.3",
     "openai": "^6.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -23,6 +31,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
