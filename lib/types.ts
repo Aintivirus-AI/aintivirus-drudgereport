@@ -6,6 +6,8 @@ export interface Headline {
   image_url: string | null;
   token_id: number | null;
   created_at: string;
+  importance_score: number;
+  mcafee_take: string | null;
   // Joined token data (optional)
   token?: TokenInfo;
 }
@@ -161,6 +163,40 @@ export interface TokenMetadata {
   name: string;
   ticker: string;
   imageUrl: string;
+}
+
+// ============= VOTE TYPES =============
+
+export interface Vote {
+  id: number;
+  headline_id: number;
+  vote_type: "wagmi" | "ngmi";
+  voter_hash: string;
+  created_at: string;
+}
+
+export interface VoteCounts {
+  wagmi: number;
+  ngmi: number;
+}
+
+// ============= ACTIVITY LOG TYPES =============
+
+export type ActivityEventType =
+  | "submission_received"
+  | "validation_started"
+  | "approved"
+  | "rejected"
+  | "token_minted"
+  | "headline_published"
+  | "vote_cast";
+
+export interface ActivityEvent {
+  id: number;
+  event_type: ActivityEventType;
+  message: string;
+  metadata: string | null;
+  created_at: string;
 }
 
 // ============= STATE MACHINE =============

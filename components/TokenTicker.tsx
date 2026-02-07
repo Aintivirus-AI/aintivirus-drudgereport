@@ -63,14 +63,6 @@ export function TokenTicker() {
             </svg>
           )}
         </button>
-        <a
-          href={PUMP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="token-ticker-buy"
-        >
-          BUY
-        </a>
       </div>
     </div>
   );

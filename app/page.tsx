@@ -4,7 +4,10 @@ import { CoinOfTheDay } from "@/components/CoinOfTheDay";
 import { TokenTicker } from "@/components/TokenTicker";
 import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getHeadlines, getMainHeadline, getCoinOfTheDay } from "@/lib/db";
+import { BreakingSiren } from "@/components/BreakingSiren";
+import { SentimentMeter } from "@/components/SentimentMeter";
+import { WarRoomFeed } from "@/components/WarRoomFeed";
+import { getHeadlines, getMainHeadline, getCoinOfTheDay, getBreakingHeadline } from "@/lib/db";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -14,6 +17,7 @@ export default function Home() {
   const rightHeadlines = getHeadlines("right", 15);
   const mainHeadline = getMainHeadline();
   const coinOfTheDay = getCoinOfTheDay();
+  const breakingHeadline = getBreakingHeadline(2, 80);
   
   // Derive HOT TOPICS from already-fetched headlines (no duplicate queries)
   const hotTopics = [...leftHeadlines.slice(0, 6), ...rightHeadlines.slice(0, 6)]
@@ -23,6 +27,9 @@ export default function Home() {
   return (
     <main className="main-content">
       <div className="grid-bg min-h-screen">
+        {/* Breaking News Siren */}
+        <BreakingSiren headline={breakingHeadline || null} />
+
         {/* Page Title */}
         <div className="border-b border-dark-200/30 py-4">
           <div className="container mx-auto px-4">
@@ -52,6 +59,9 @@ export default function Home() {
 
         {/* Top coins scrolling ribbon */}
         <TopCoinsRibbon />
+
+        {/* Community Sentiment Meter */}
+        <SentimentMeter />
 
         {/* Neon divider */}
         <div className="neon-divider" />
@@ -157,6 +167,21 @@ export default function Home() {
               <HeadlineColumn headlines={rightHeadlines} />
             </div>
           </div>
+        </div>
+
+        {/* War Room - Live Activity Feed */}
+        <div className="neon-divider" />
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <div className="text-center mb-6">
+            <h2 className="text-xl md:text-2xl font-bold tracking-wider">
+              <span className="text-neon-cyan">WAR</span>{" "}
+              <span className="text-white">ROOM</span>
+            </h2>
+            <p className="text-gray-500 text-xs mt-1 tracking-widest font-mono">
+              LIVE PLATFORM ACTIVITY
+            </p>
+          </div>
+          <WarRoomFeed />
         </div>
       </div>
     </main>

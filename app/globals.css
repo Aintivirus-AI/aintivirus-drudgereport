@@ -1551,12 +1551,14 @@ body.nav-no-scroll {
 .top-coins-ribbon {
   width: 100%;
   overflow: hidden;
-  background: linear-gradient(90deg, #8b0000, #cc0000, #8b0000);
-  border-top: 1px solid rgba(255, 50, 50, 0.4);
-  border-bottom: 1px solid rgba(255, 50, 50, 0.4);
-  box-shadow: 0 0 12px rgba(255, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(90deg, rgba(0, 20, 40, 0.85), rgba(0, 60, 80, 0.75), rgba(20, 0, 60, 0.75), rgba(0, 20, 40, 0.85));
+  border-top: 1px solid rgba(0, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.08), inset 0 0 30px rgba(0, 255, 255, 0.03);
   padding: 0.45rem 0;
   position: relative;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .top-coins-ribbon::before,
@@ -1572,12 +1574,12 @@ body.nav-no-scroll {
 
 .top-coins-ribbon::before {
   left: 0;
-  background: linear-gradient(to right, #8b0000, transparent);
+  background: linear-gradient(to right, rgba(0, 20, 40, 0.95), transparent);
 }
 
 .top-coins-ribbon::after {
   right: 0;
-  background: linear-gradient(to left, #8b0000, transparent);
+  background: linear-gradient(to left, rgba(0, 20, 40, 0.95), transparent);
 }
 
 .ribbon-track {
@@ -1693,34 +1695,46 @@ body.nav-no-scroll {
 
 /* Light theme overrides */
 :root[data-theme="light"] .top-coins-ribbon {
-  background: linear-gradient(90deg, #a01010, #d42020, #a01010);
-  border-top-color: rgba(200, 30, 30, 0.4);
-  border-bottom-color: rgba(200, 30, 30, 0.4);
-  box-shadow: 0 0 12px rgba(200, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: linear-gradient(90deg, rgba(230, 240, 250, 0.88), rgba(210, 235, 245, 0.8), rgba(225, 215, 245, 0.8), rgba(230, 240, 250, 0.88));
+  border-top-color: rgba(0, 130, 150, 0.2);
+  border-bottom-color: rgba(0, 130, 150, 0.2);
+  box-shadow: 0 0 16px rgba(0, 130, 150, 0.06), inset 0 0 20px rgba(0, 130, 150, 0.03);
 }
 
 :root[data-theme="light"] .top-coins-ribbon::before {
-  background: linear-gradient(to right, #a01010, transparent);
+  background: linear-gradient(to right, rgba(230, 240, 250, 0.95), transparent);
 }
 
 :root[data-theme="light"] .top-coins-ribbon::after {
-  background: linear-gradient(to left, #a01010, transparent);
+  background: linear-gradient(to left, rgba(230, 240, 250, 0.95), transparent);
 }
 
 :root[data-theme="light"] .ribbon-ticker {
-  color: #fff;
+  color: #1a2a3a;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .ribbon-rank {
+  color: rgba(160, 120, 0, 0.9);
+  text-shadow: none;
 }
 
 :root[data-theme="light"] .ribbon-change-up {
-  color: #90ff90;
+  color: #15803d;
+  text-shadow: none;
 }
 
 :root[data-theme="light"] .ribbon-change-down {
-  color: #ffbbbb;
+  color: #dc2626;
+  text-shadow: none;
 }
 
 :root[data-theme="light"] .ribbon-mcap {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="light"] .ribbon-separator {
+  color: rgba(0, 0, 0, 0.12);
 }
 
 /* ============= ARTICLE SUMMARY ============= */
@@ -1796,4 +1810,858 @@ body.nav-no-scroll {
   background: rgba(0, 120, 120, 0.15);
   border-color: rgba(0, 120, 120, 0.4);
   color: #006666;
+}
+
+/* ========================================
+   BREAKING NEWS SIREN
+   ======================================== */
+
+@keyframes siren-flash {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes siren-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.6), 0 0 60px rgba(239, 68, 68, 0.2); }
+}
+
+@keyframes siren-text-glow {
+  0%, 100% { text-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
+  50% { text-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 40px rgba(239, 68, 68, 0.4); }
+}
+
+@keyframes siren-slide-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.siren-container {
+  animation: siren-slide-down 0.4s ease-out;
+}
+
+.siren-banner {
+  position: relative;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(239, 68, 68, 0.15) 100%);
+  border-bottom: 2px solid rgba(239, 68, 68, 0.5);
+  padding: 12px 16px;
+  animation: siren-pulse 2s ease-in-out infinite;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.siren-light {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 120px;
+}
+
+.siren-light-left {
+  left: 0;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.4), transparent);
+  animation: siren-flash 1s ease-in-out infinite;
+}
+
+.siren-light-right {
+  right: 0;
+  background: linear-gradient(-90deg, rgba(0, 211, 255, 0.4), transparent);
+  animation: siren-flash 1s ease-in-out infinite 0.5s;
+}
+
+.siren-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.siren-icon {
+  flex-shrink: 0;
+  color: #ef4444;
+  animation: siren-flash 1s ease-in-out infinite;
+}
+
+.siren-text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.siren-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.2);
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  animation: siren-text-glow 2s ease-in-out infinite;
+}
+
+.siren-headline {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.siren-headline:hover {
+  color: #ef4444;
+  text-decoration: underline;
+}
+
+.siren-dismiss {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.siren-dismiss:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ========================================
+   AI MCAFEE COMMENTARY
+   ======================================== */
+
+@keyframes mcafee-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes mcafee-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mcafee-commentary {
+  background: linear-gradient(135deg, rgba(191, 90, 242, 0.08) 0%, rgba(191, 90, 242, 0.03) 100%);
+  border: 1px solid rgba(191, 90, 242, 0.25);
+  border-radius: 12px;
+  padding: 20px;
+  animation: mcafee-fade-in 0.5s ease-out;
+}
+
+.mcafee-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mcafee-ghost-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.mcafee-attribution {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(191, 90, 242, 0.9);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.mcafee-header-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(191, 90, 242, 0.3), transparent);
+}
+
+.mcafee-quote {
+  font-size: 17px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+  margin: 0;
+  padding-left: 16px;
+  border-left: 3px solid rgba(191, 90, 242, 0.4);
+}
+
+.mcafee-cursor {
+  color: var(--neon-purple);
+  animation: mcafee-cursor-blink 0.8s infinite;
+  font-weight: 300;
+  font-style: normal;
+}
+
+/* McAfee compact (for inline) */
+.mcafee-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(191, 90, 242, 0.8);
+  font-style: italic;
+}
+
+.mcafee-compact .mcafee-ghost-icon {
+  font-size: 14px;
+}
+
+.mcafee-compact-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px;
+}
+
+/* McAfee tooltip */
+.mcafee-tooltip-wrapper {
+  position: relative;
+  display: inline;
+}
+
+.mcafee-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(20, 12, 30, 0.97);
+  border: 1px solid rgba(191, 90, 242, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(191, 90, 242, 0.1);
+  max-width: 320px;
+  width: max-content;
+  animation: mcafee-fade-in 0.2s ease-out;
+  pointer-events: none;
+}
+
+.mcafee-tooltip .mcafee-ghost-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.mcafee-tooltip-text {
+  font-size: 13px;
+  color: rgba(191, 90, 242, 0.9);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* Light mode */
+[data-theme="light"] .mcafee-commentary {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06) 0%, rgba(124, 58, 237, 0.02) 100%);
+  border-color: rgba(124, 58, 237, 0.2);
+}
+
+[data-theme="light"] .mcafee-quote {
+  color: rgba(0, 0, 0, 0.8);
+  border-left-color: rgba(124, 58, 237, 0.4);
+}
+
+[data-theme="light"] .mcafee-attribution {
+  color: rgba(124, 58, 237, 0.9);
+}
+
+/* ========================================
+   WAGMI/NGMI VOTE BUTTONS
+   ======================================== */
+
+/* Full vote buttons (article page) */
+.vote-full {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vote-buttons-row {
+  display: flex;
+  gap: 10px;
+}
+
+.vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  flex: 1;
+  justify-content: center;
+}
+
+.vote-btn:hover:not(.vote-disabled) {
+  transform: translateY(-1px);
+}
+
+.vote-btn-wagmi {
+  border-color: rgba(0, 255, 157, 0.2);
+}
+
+.vote-btn-wagmi:hover:not(.vote-disabled) {
+  background: rgba(0, 255, 157, 0.1);
+  border-color: rgba(0, 255, 157, 0.5);
+  color: #00ff9d;
+  box-shadow: 0 0 15px rgba(0, 255, 157, 0.15);
+}
+
+.vote-btn-wagmi.vote-active {
+  background: rgba(0, 255, 157, 0.15);
+  border-color: rgba(0, 255, 157, 0.5);
+  color: #00ff9d;
+}
+
+.vote-btn-ngmi {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.vote-btn-ngmi:hover:not(.vote-disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+}
+
+.vote-btn-ngmi.vote-active {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+
+.vote-btn.vote-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.vote-label {
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.vote-count {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+/* Vote bar */
+.vote-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vote-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.25);
+  overflow: hidden;
+}
+
+.vote-bar-fill.vote-bar-wagmi {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff9d, #00D3FF);
+  border-radius: 3px;
+  transition: width 0.5s ease-out;
+}
+
+.vote-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+.vote-bar-label-wagmi {
+  color: #00ff9d;
+}
+
+.vote-bar-label-ngmi {
+  color: #ef4444;
+}
+
+/* Compact vote buttons (headline links) */
+.vote-compact {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.vote-compact-btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.vote-compact-btn:hover:not(.vote-disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vote-compact-btn.vote-wagmi:hover:not(.vote-disabled) {
+  color: #00ff9d;
+}
+
+.vote-compact-btn.vote-ngmi:hover:not(.vote-disabled) {
+  color: #ef4444;
+}
+
+.vote-compact-btn.vote-wagmi.vote-active {
+  color: #00ff9d;
+}
+
+.vote-compact-btn.vote-ngmi.vote-active {
+  color: #ef4444;
+}
+
+.vote-compact-btn.vote-disabled {
+  cursor: default;
+}
+
+.vote-compact-count {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-weight: 600;
+}
+
+.vote-icon-emoji {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.vote-icon-emoji-lg {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Light mode vote styles */
+[data-theme="light"] .vote-btn {
+  background: rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .vote-btn-wagmi:hover:not(.vote-disabled) {
+  background: rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.5);
+  color: #059669;
+}
+
+[data-theme="light"] .vote-btn-wagmi.vote-active {
+  background: rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.5);
+  color: #059669;
+}
+
+[data-theme="light"] .vote-btn-ngmi:hover:not(.vote-disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #dc2626;
+}
+
+[data-theme="light"] .vote-compact-btn {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   COMMUNITY SENTIMENT METER
+   ======================================== */
+
+.sentiment-meter {
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sentiment-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sentiment-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+.sentiment-mood {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+.sentiment-total {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-left: auto;
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+.sentiment-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(239, 68, 68, 0.3);
+  overflow: hidden;
+  max-width: 1200px;
+  margin: 0 auto 4px;
+}
+
+.sentiment-bar-wagmi {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff9d, #00D3FF);
+  border-radius: 2px;
+  transition: width 1s ease-out;
+}
+
+.sentiment-labels {
+  display: flex;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sentiment-wagmi {
+  font-size: 10px;
+  font-weight: 700;
+  color: #00ff9d;
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+.sentiment-ngmi {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ef4444;
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+/* Light mode sentiment */
+[data-theme="light"] .sentiment-meter {
+  background: rgba(0, 0, 0, 0.06);
+  border-bottom-color: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .sentiment-title {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .sentiment-mood {
+  filter: brightness(0.85);
+}
+
+[data-theme="light"] .sentiment-total {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .sentiment-bar {
+  background: rgba(220, 38, 38, 0.25);
+}
+
+[data-theme="light"] .sentiment-bar-wagmi {
+  background: linear-gradient(90deg, #059669, #0077b6);
+}
+
+[data-theme="light"] .sentiment-wagmi {
+  color: #047857;
+  font-weight: 800;
+}
+
+[data-theme="light"] .sentiment-ngmi {
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+[data-theme="light"] .sentiment-labels {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* ========================================
+   WAR ROOM NAV LINK
+   ======================================== */
+
+.war-room-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #00ff9d;
+  text-decoration: none;
+  font-family: var(--font-jetbrains-mono), monospace;
+  transition: all 0.2s;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 255, 157, 0.2);
+  background: rgba(0, 255, 157, 0.05);
+}
+
+.war-room-nav-link:hover {
+  background: rgba(0, 255, 157, 0.12);
+  border-color: rgba(0, 255, 157, 0.4);
+  box-shadow: 0 0 12px rgba(0, 255, 157, 0.15);
+}
+
+@keyframes war-room-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.war-room-nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00ff9d;
+  animation: war-room-pulse 2s ease-in-out infinite;
+}
+
+/* ========================================
+   WAR ROOM PAGE
+   ======================================== */
+
+.warroom-page {
+  background: #020208;
+  color: #ededed;
+}
+
+.warroom {
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+.warroom-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.warroom-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.warroom-status-connected {
+  background: #00ff9d;
+  box-shadow: 0 0 8px rgba(0, 255, 157, 0.5);
+  animation: war-room-pulse 2s ease-in-out infinite;
+}
+
+.warroom-status-disconnected {
+  background: #ef4444;
+}
+
+/* Stats dashboard */
+.warroom-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .warroom-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.warroom-stat {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+
+.warroom-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.warroom-stat-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Event feed */
+.warroom-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.warroom-feed::-webkit-scrollbar {
+  width: 4px;
+}
+
+.warroom-feed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.warroom-feed::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+@keyframes warroom-event-slide {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.warroom-event {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 3px solid #9ca3af;
+  border-radius: 0 6px 6px 0;
+  animation: warroom-event-slide 0.3s ease-out both;
+  transition: background 0.15s;
+}
+
+.warroom-event:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.warroom-event-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warroom-event-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.warroom-event-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.warroom-event-time {
+  margin-left: auto;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.warroom-event-message {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+  padding-left: 22px;
+}
+
+.warroom-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+}
+
+.warroom-empty-sub {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.15);
+}
+
+/* Light mode War Room */
+[data-theme="light"] .warroom-status {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .warroom-status-connected {
+  background: #059669;
+  box-shadow: 0 0 8px rgba(5, 150, 105, 0.4);
+}
+
+[data-theme="light"] .warroom-stat {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .warroom-stat-value {
+  filter: brightness(0.7);
+}
+
+[data-theme="light"] .warroom-stat-label {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .warroom-event {
+  background: rgba(0, 0, 0, 0.03);
+  border-left-color: #9ca3af;
+}
+
+[data-theme="light"] .warroom-event:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .warroom-event-label {
+  filter: brightness(0.75);
+}
+
+[data-theme="light"] .warroom-event-time {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .warroom-event-message {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] .warroom-feed::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .warroom-empty {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .warroom-empty-sub {
+  color: rgba(0, 0, 0, 0.25);
 }

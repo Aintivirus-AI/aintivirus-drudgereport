@@ -2,6 +2,8 @@ import type { Headline } from "@/lib/types";
 import { TokenBadge, TokenBadgeCompact } from "./TokenBadge";
 import { ShareButton } from "./ShareButton";
 import { ArticleButton } from "./ArticleButton";
+import { VoteButtons } from "./VoteButtons";
+import { McAfeeTooltip } from "./McAfeeCommentary";
 
 interface HeadlineLinkProps {
   headline: Headline;
@@ -10,7 +12,8 @@ interface HeadlineLinkProps {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export function HeadlineLink({ headline }: HeadlineLinkProps) {
-  const articleUrl = `${SITE_URL}/article/${headline.id}`;
+  const articlePath = `/article/${headline.id}`;
+  const articleUrl = `${SITE_URL}${articlePath}`;
 
   // If there's an image, show a card-style layout
   if (headline.image_url) {
@@ -42,16 +45,31 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-0">
               <div className="flex items-start gap-1">
-                <a
-                  href={headline.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="neon-link text-sm hover:underline leading-tight flex-1"
-                  title={headline.title}
-                >
-                  {headline.title}
-                </a>
-                <ArticleButton url={articleUrl} />
+                {headline.mcafee_take ? (
+                  <McAfeeTooltip take={headline.mcafee_take}>
+                    <a
+                      href={headline.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="neon-link text-sm hover:underline leading-tight flex-1"
+                      title={headline.title}
+                    >
+                      {headline.title}
+                    </a>
+                  </McAfeeTooltip>
+                ) : (
+                  <a
+                    href={headline.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="neon-link text-sm hover:underline leading-tight flex-1"
+                    title={headline.title}
+                  >
+                    {headline.title}
+                  </a>
+                )}
+                <VoteButtons headlineId={headline.id} compact />
+                <ArticleButton url={articlePath} />
                 <ShareButton
                   title={headline.title}
                   url={articleUrl}
@@ -77,16 +95,31 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
   // Default text-only layout
   return (
     <li className="headline-bullet py-1 flex items-center gap-2 group">
-      <a
-        href={headline.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="neon-link text-sm hover:underline flex-1"
-        title={headline.title}
-      >
-        {headline.title}
-      </a>
-      <ArticleButton url={articleUrl} />
+      {headline.mcafee_take ? (
+        <McAfeeTooltip take={headline.mcafee_take}>
+          <a
+            href={headline.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="neon-link text-sm hover:underline flex-1"
+            title={headline.title}
+          >
+            {headline.title}
+          </a>
+        </McAfeeTooltip>
+      ) : (
+        <a
+          href={headline.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="neon-link text-sm hover:underline flex-1"
+          title={headline.title}
+        >
+          {headline.title}
+        </a>
+      )}
+      <VoteButtons headlineId={headline.id} compact />
+      <ArticleButton url={articlePath} />
       <ShareButton
         title={headline.title}
         url={articleUrl}

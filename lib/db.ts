@@ -12,7 +12,11 @@ import type {
   ContentType,
   Token,
   RevenueEvent,
-  RevenueStatus
+  RevenueStatus,
+  Vote,
+  VoteCounts,
+  ActivityEvent,
+  ActivityEventType
 } from "./types";
 
 // Database path
@@ -113,6 +117,25 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- Votes table (WAGMI/NGMI community voting)
+  CREATE TABLE IF NOT EXISTS votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    headline_id INTEGER NOT NULL REFERENCES headlines(id),
+    vote_type TEXT NOT NULL CHECK(vote_type IN ('wagmi', 'ngmi')),
+    voter_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(headline_id, voter_hash)
+  );
+
+  -- Activity log (War Room feed)
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    metadata TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   -- Create indexes for better query performance
   CREATE INDEX IF NOT EXISTS idx_headlines_column ON headlines(column);
   CREATE INDEX IF NOT EXISTS idx_headlines_created_at ON headlines(created_at DESC);
@@ -124,6 +147,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tokens_submission_id ON tokens(submission_id);
   CREATE INDEX IF NOT EXISTS idx_revenue_events_token_id ON revenue_events(token_id);
   CREATE INDEX IF NOT EXISTS idx_revenue_events_status ON revenue_events(status);
+  CREATE INDEX IF NOT EXISTS idx_votes_headline_id ON votes(headline_id);
+  CREATE INDEX IF NOT EXISTS idx_votes_voter_hash ON votes(voter_hash);
+  CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_activity_log_event_type ON activity_log(event_type);
 `);
 
 // Migration: Add image_url column if it doesn't exist
@@ -146,6 +173,18 @@ try {
 // Migration: Add cached_content to submissions
 try {
   db.exec(`ALTER TABLE submissions ADD COLUMN cached_content TEXT`);
+} catch {
+  // Column already exists
+}
+// Migration: Add importance_score to headlines (for Breaking Siren)
+try {
+  db.exec(`ALTER TABLE headlines ADD COLUMN importance_score INTEGER DEFAULT 0`);
+} catch {
+  // Column already exists
+}
+// Migration: Add mcafee_take to headlines (for AI McAfee Commentary)
+try {
+  db.exec(`ALTER TABLE headlines ADD COLUMN mcafee_take TEXT`);
 } catch {
   // Column already exists
 }
@@ -178,6 +217,7 @@ export function getHeadlines(
   const stmt = db.prepare(`
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
       t.ticker, t.pump_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
@@ -195,6 +235,8 @@ export function getHeadlines(
     image_url: row.image_url,
     token_id: row.token_id,
     created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || ""
@@ -210,6 +252,7 @@ export function getAllHeadlines(limit: number = 100): Headline[] {
   const stmt = db.prepare(`
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
       t.ticker, t.pump_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
@@ -226,6 +269,8 @@ export function getAllHeadlines(limit: number = 100): Headline[] {
     image_url: row.image_url,
     token_id: row.token_id,
     created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || ""
@@ -279,6 +324,7 @@ export function getHeadlineById(id: number): Headline | undefined {
   const stmt = db.prepare(`
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
       t.ticker, t.pump_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
@@ -296,6 +342,8 @@ export function getHeadlineById(id: number): Headline | undefined {
     image_url: row.image_url,
     token_id: row.token_id,
     created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || ""
@@ -317,6 +365,7 @@ export function getHeadlineWithDetails(id: number): (Headline & {
   const stmt = db.prepare(`
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
       t.ticker, t.pump_url, t.token_name, t.mint_address, t.image_url as token_image_url,
       s.telegram_username as submitter_username, s.created_at as submission_created_at,
       s.cached_content
@@ -336,6 +385,8 @@ export function getHeadlineWithDetails(id: number): (Headline & {
     image_url: row.image_url,
     token_id: row.token_id,
     created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || ""
@@ -993,6 +1044,225 @@ export function detectContentType(url: string): ContentType {
   }
   
   return "article";
+}
+
+// ============= HEADLINE EXTRAS (Siren + McAfee) =============
+
+/**
+ * Update headline importance score (for Breaking Siren).
+ */
+export function updateHeadlineImportanceScore(id: number, score: number): boolean {
+  const stmt = db.prepare(`UPDATE headlines SET importance_score = ? WHERE id = ?`);
+  const result = stmt.run(score, id);
+  return result.changes > 0;
+}
+
+/**
+ * Update headline McAfee take (AI commentary).
+ */
+export function updateHeadlineMcAfeeTake(id: number, take: string): boolean {
+  const stmt = db.prepare(`UPDATE headlines SET mcafee_take = ? WHERE id = ?`);
+  const result = stmt.run(take, id);
+  return result.changes > 0;
+}
+
+/**
+ * Get the most important breaking headline from the last N hours.
+ * Returns the headline with the highest importance_score >= threshold.
+ */
+export function getBreakingHeadline(
+  hours: number = 2,
+  threshold: number = 80
+): Headline | undefined {
+  const stmt = db.prepare(`
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
+      t.ticker, t.pump_url
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    WHERE h.importance_score >= ?
+    AND h.created_at > datetime('now', '-' || ? || ' hours')
+    ORDER BY h.importance_score DESC, h.created_at DESC
+    LIMIT 1
+  `);
+  const row = stmt.get(threshold, hours) as (Headline & { ticker?: string; pump_url?: string }) | undefined;
+  if (!row) return undefined;
+
+  return {
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || ""
+    } : undefined
+  };
+}
+
+// ============= VOTES CRUD (WAGMI/NGMI) =============
+
+/**
+ * Cast a vote (WAGMI or NGMI). Uses UNIQUE constraint for dedup.
+ * Returns true if the vote was cast, false if already voted.
+ */
+export function castVote(
+  headlineId: number,
+  voteType: "wagmi" | "ngmi",
+  voterHash: string
+): boolean {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO votes (headline_id, vote_type, voter_hash)
+      VALUES (?, ?, ?)
+    `);
+    const result = stmt.run(headlineId, voteType, voterHash);
+    return result.changes > 0;
+  } catch {
+    // UNIQUE constraint violation = already voted
+    return false;
+  }
+}
+
+/**
+ * Get vote counts for a specific headline.
+ */
+export function getVoteCounts(headlineId: number): VoteCounts {
+  const stmt = db.prepare(`
+    SELECT 
+      COALESCE(SUM(CASE WHEN vote_type = 'wagmi' THEN 1 ELSE 0 END), 0) as wagmi,
+      COALESCE(SUM(CASE WHEN vote_type = 'ngmi' THEN 1 ELSE 0 END), 0) as ngmi
+    FROM votes
+    WHERE headline_id = ?
+  `);
+  return stmt.get(headlineId) as VoteCounts;
+}
+
+/**
+ * Get global sentiment across all headlines.
+ */
+export function getGlobalSentiment(): VoteCounts & { ratio: number } {
+  const stmt = db.prepare(`
+    SELECT 
+      COALESCE(SUM(CASE WHEN vote_type = 'wagmi' THEN 1 ELSE 0 END), 0) as wagmi,
+      COALESCE(SUM(CASE WHEN vote_type = 'ngmi' THEN 1 ELSE 0 END), 0) as ngmi
+    FROM votes
+  `);
+  const counts = stmt.get() as VoteCounts;
+  const total = counts.wagmi + counts.ngmi;
+  return {
+    ...counts,
+    ratio: total > 0 ? counts.wagmi / total : 0.5,
+  };
+}
+
+/**
+ * Check if a voter has already voted on a headline.
+ */
+export function hasVoted(headlineId: number, voterHash: string): string | null {
+  const stmt = db.prepare(`
+    SELECT vote_type FROM votes WHERE headline_id = ? AND voter_hash = ?
+  `);
+  const row = stmt.get(headlineId, voterHash) as { vote_type: string } | undefined;
+  return row ? row.vote_type : null;
+}
+
+// ============= ACTIVITY LOG (War Room) =============
+
+/**
+ * Insert an activity log entry.
+ */
+export function insertActivityLog(
+  eventType: ActivityEventType,
+  message: string,
+  metadata?: Record<string, unknown>
+): ActivityEvent {
+  const stmt = db.prepare(`
+    INSERT INTO activity_log (event_type, message, metadata)
+    VALUES (?, ?, ?)
+    RETURNING id, event_type, message, metadata, created_at
+  `);
+  return stmt.get(
+    eventType,
+    message,
+    metadata ? JSON.stringify(metadata) : null
+  ) as ActivityEvent;
+}
+
+/**
+ * Get recent activity log entries.
+ * If `afterId` is provided, returns only events after that ID (for polling).
+ */
+export function getActivityLog(
+  limit: number = 50,
+  afterId?: number
+): ActivityEvent[] {
+  if (afterId) {
+    const stmt = db.prepare(`
+      SELECT id, event_type, message, metadata, created_at
+      FROM activity_log
+      WHERE id > ?
+      ORDER BY id DESC
+      LIMIT ?
+    `);
+    return stmt.all(afterId, limit) as ActivityEvent[];
+  }
+  const stmt = db.prepare(`
+    SELECT id, event_type, message, metadata, created_at
+    FROM activity_log
+    ORDER BY id DESC
+    LIMIT ?
+  `);
+  return stmt.all(limit) as ActivityEvent[];
+}
+
+/**
+ * Get activity stats for the War Room dashboard.
+ */
+export function getActivityStats(): {
+  submissionsToday: number;
+  tokensLaunchedToday: number;
+  votesToday: number;
+  approvalRate: number;
+} {
+  const submissionsToday = db.prepare(`
+    SELECT COUNT(*) as count FROM submissions
+    WHERE date(created_at) = date('now')
+  `).get() as { count: number };
+
+  const tokensToday = db.prepare(`
+    SELECT COUNT(*) as count FROM tokens
+    WHERE date(created_at) = date('now')
+    AND mint_address IS NOT NULL
+  `).get() as { count: number };
+
+  const votesToday = db.prepare(`
+    SELECT COUNT(*) as count FROM votes
+    WHERE date(created_at) = date('now')
+  `).get() as { count: number };
+
+  const approvalStats = db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN status IN ('approved', 'published') THEN 1 ELSE 0 END) as approved
+    FROM submissions
+    WHERE status NOT IN ('pending', 'validating')
+  `).get() as { total: number; approved: number };
+
+  return {
+    submissionsToday: submissionsToday.count,
+    tokensLaunchedToday: tokensToday.count,
+    votesToday: votesToday.count,
+    approvalRate: approvalStats.total > 0
+      ? Math.round((approvalStats.approved / approvalStats.total) * 100)
+      : 0,
+  };
 }
 
 export default db;

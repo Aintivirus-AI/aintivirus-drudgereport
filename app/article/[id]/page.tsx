@@ -5,6 +5,9 @@ import { TokenBadge } from "@/components/TokenBadge";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { CopyAddressButton } from "@/components/CopyAddressButton";
 import { ListenButton } from "@/components/ListenButton";
+import { TimeAgo } from "@/components/TimeAgo";
+import { McAfeeCommentary } from "@/components/McAfeeCommentary";
+import { VoteButtons } from "@/components/VoteButtons";
 
 export const revalidate = 30;
 
@@ -17,6 +20,9 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
   const article = getHeadlineWithDetails(parseInt(id, 10));
   if (!article) return { title: "Article Not Found" };
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const ogImageUrl = `${siteUrl}/api/og/${id}`;
+
   const description = article.token
     ? `$${article.token.ticker} token launched for this story. Trade on pump.fun. Powered by The McAfee Report.`
     : "Breaking news on The McAfee Report. Powered by AintiVirus.";
@@ -27,14 +33,14 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     openGraph: {
       title: article.title,
       description,
-      images: article.image_url ? [article.image_url] : [],
+      images: [{ url: ogImageUrl, width: 1200, height: 630 }],
       type: "article",
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
       description,
-      images: article.image_url ? [article.image_url] : [],
+      images: [ogImageUrl],
     },
   };
 }
@@ -52,7 +58,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const telegramShareUrl = encodeURIComponent(articleUrl);
 
   const publishedDate = new Date(article.created_at);
-  const timeAgo = getTimeAgo(publishedDate);
 
   return (
     <main className="min-h-screen grid-bg">
@@ -63,7 +68,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <a href="/" className="text-neon-cyan hover:underline text-sm font-mono">
               &larr; Back to The McAfee Report
             </a>
-            <span className="text-gray-500 text-xs">{timeAgo}</span>
+            <TimeAgo date={article.created_at} />
           </div>
         </div>
       </div>
@@ -84,6 +89,18 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-red-500 leading-tight mb-4">
           {article.title}
         </h1>
+
+        {/* AI McAfee Commentary */}
+        {article.mcafee_take && (
+          <div className="mb-6">
+            <McAfeeCommentary take={article.mcafee_take} />
+          </div>
+        )}
+
+        {/* WAGMI/NGMI Voting */}
+        <div className="mb-6">
+          <VoteButtons headlineId={article.id} />
+        </div>
 
         {/* Meta info */}
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mb-8">
@@ -242,13 +259,3 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   );
 }
 
-function getTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}

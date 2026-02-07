@@ -18,12 +18,16 @@ import {
   getSubmissionById,
   getSubmissionCountByStatus,
   updateSubmissionCachedContent,
+  updateHeadlineImportanceScore,
+  updateHeadlineMcAfeeTake,
 } from "./db";
 import { validateSubmission, smartFetchContent } from "./ai-validator";
 import { generateTokenMetadata } from "./token-generator";
 import { deployToken } from "./pump-deployer";
 import { notifySubmitterPublished } from "./telegram-notifier";
 import { tweetArticlePublished, isTwitterConfigured } from "./twitter-poster";
+import { generateMcAfeeTake, scoreHeadlineImportance } from "./mcafee-commentator";
+import { ActivityLog } from "./activity-logger";
 import type { Submission, PageContent } from "./types";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -59,6 +63,7 @@ export async function processValidationQueue(): Promise<number> {
     try {
       // Mark as validating
       updateSubmissionStatus(submission.id, "validating");
+      ActivityLog.validationStarted(submission.id, submission.url);
       console.log(
         `[Scheduler] Validating submission #${submission.id}: ${submission.url}`
       );
@@ -108,6 +113,7 @@ export async function processValidationQueue(): Promise<number> {
 
       if (result.isValid) {
         updateSubmissionStatus(submission.id, "approved");
+        ActivityLog.approved(submission.id, content.title || "Untitled");
         console.log(
           `[Scheduler] Approved #${submission.id} (fact: ${result.factScore}, fresh: ${result.freshnessHours}h)`
         );
@@ -117,6 +123,7 @@ export async function processValidationQueue(): Promise<number> {
           "rejected",
           result.rejectionReason
         );
+        ActivityLog.rejected(submission.id, result.rejectionReason || "Unknown reason");
         console.log(
           `[Scheduler] Rejected #${submission.id}: ${result.rejectionReason}`
         );
@@ -233,6 +240,25 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       `[Scheduler] Created headline #${headlineRecord.id} for submission #${submission.id}`
     );
 
+    // Generate AI importance score + McAfee commentary in parallel with token generation
+    const aiEnrichmentPromise = (async () => {
+      try {
+        const [importanceScore, mcafeeTake] = await Promise.all([
+          scoreHeadlineImportance(headline, content),
+          generateMcAfeeTake(headline, content),
+        ]);
+
+        updateHeadlineImportanceScore(headlineRecord.id, importanceScore);
+        updateHeadlineMcAfeeTake(headlineRecord.id, mcafeeTake);
+
+        console.log(
+          `[Scheduler] AI enrichment for #${headlineRecord.id}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`
+        );
+      } catch (aiError) {
+        console.warn(`[Scheduler] AI enrichment failed (non-fatal):`, aiError);
+      }
+    })();
+
     // Generate token metadata and deploy
     let deployedTicker: string | undefined;
     let deployedPumpUrl: string | undefined;
@@ -256,6 +282,7 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       if (deployResult.success) {
         deployedTicker = tokenMetadata.ticker;
         deployedPumpUrl = deployResult.pumpUrl;
+        ActivityLog.tokenMinted(tokenMetadata.ticker, headline, deployResult.mintAddress);
         console.log(
           `[Scheduler] Token deployed: ${deployResult.mintAddress}`
         );
@@ -272,8 +299,14 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       );
     }
 
+    // Wait for AI enrichment to complete before marking as published
+    await aiEnrichmentPromise;
+
     // Mark as published
     markSubmissionPublished(submission.id);
+
+    // Log to activity feed
+    ActivityLog.headlinePublished(headlineRecord.id, headline, deployedTicker);
 
     // Notify the submitter via Telegram
     try {
