@@ -6,6 +6,7 @@ import { useTickerPrice } from "@/hooks/useTokenPrices";
 interface TokenBadgeProps {
   pumpUrl: string;
   ticker: string;
+  imageUrl?: string;
   priceChange?: number;
   showTicker?: boolean;
   size?: "sm" | "md";
@@ -14,6 +15,7 @@ interface TokenBadgeProps {
 export function TokenBadge({ 
   pumpUrl, 
   ticker, 
+  imageUrl,
   priceChange: initialPriceChange, 
   showTicker = true,
   size = "sm" 
@@ -79,14 +81,22 @@ export function TokenBadge({
       title={`Trade $${ticker} on pump.fun`}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Pump.fun icon */}
-      <svg 
-        viewBox="0 0 24 24" 
-        fill="currentColor" 
-        className={iconSize}
-      >
-        <path d="M12.5 2.5c-.28-.28-.72-.28-1 0l-3.54 3.54c-.28.28-.28.72 0 1s.72.28 1 0L11 5v5H6l2.04-2.04c.28-.28.28-.72 0-1s-.72-.28-1 0L3.5 10.5c-.28.28-.28.72 0 1l3.54 3.54c.28.28.72.28 1 0s.28-.72 0-1L6 12h5v5l-2.04-2.04c-.28-.28-.72-.28-1 0s-.28.72 0 1l3.54 3.54c.28.28.72.28 1 0l3.54-3.54c.28-.28.28-.72 0-1s-.72-.28-1 0L13 17v-5h5l-2.04 2.04c-.28.28-.28.72 0 1s.72.28 1 0l3.54-3.54c.28-.28.28-.72 0-1l-3.54-3.54c-.28-.28-.72-.28-1 0s-.28.72 0 1L18 10h-5V5l2.04 2.04c.28.28.72.28 1 0s.28-.72 0-1L12.5 2.5z"/>
-      </svg>
+      {/* Token logo or fallback pump.fun icon */}
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={ticker}
+          className={`${size === "sm" ? "w-3.5 h-3.5" : "w-5 h-5"} rounded-full object-cover flex-shrink-0`}
+        />
+      ) : (
+        <svg 
+          viewBox="0 0 24 24" 
+          fill="currentColor" 
+          className={iconSize}
+        >
+          <path d="M12.5 2.5c-.28-.28-.72-.28-1 0l-3.54 3.54c-.28.28-.28.72 0 1s.72.28 1 0L11 5v5H6l2.04-2.04c.28-.28.28-.72 0-1s-.72-.28-1 0L3.5 10.5c-.28.28-.28.72 0 1l3.54 3.54c.28.28.72.28 1 0s.28-.72 0-1L6 12h5v5l-2.04-2.04c-.28-.28-.72-.28-1 0s-.28.72 0 1l3.54 3.54c.28.28.72.28 1 0l3.54-3.54c.28-.28.28-.72 0-1s-.72-.28-1 0L13 17v-5h5l-2.04 2.04c-.28.28-.28.72 0 1s.72.28 1 0l3.54-3.54c.28-.28.28-.72 0-1l-3.54-3.54c-.28-.28-.72-.28-1 0s-.28.72 0 1L18 10h-5V5l2.04 2.04c.28.28.72.28 1 0s.28-.72 0-1L12.5 2.5z"/>
+        </svg>
+      )}
       
       {/* Ticker */}
       {showTicker && (

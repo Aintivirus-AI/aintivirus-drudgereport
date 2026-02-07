@@ -29,6 +29,11 @@ export const metadata: Metadata = {
   title: "THE MCAFEE REPORT",
   description: "The Drudge Report of Crypto - Real-time news and updates for the crypto community",
   keywords: ["crypto", "cryptocurrency", "news", "bitcoin", "ethereum", "defi", "web3"],
+  icons: {
+    icon: "/mcafee-logo.png",
+    shortcut: "/mcafee-logo.png",
+    apple: "/mcafee-logo.png",
+  },
 };
 
 export default function RootLayout({

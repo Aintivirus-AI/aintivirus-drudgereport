@@ -218,14 +218,14 @@ export function getHeadlines(
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       h.importance_score, h.mcafee_take,
-      t.ticker, t.pump_url
+      t.ticker, t.pump_url, t.image_url as token_image_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
     WHERE h.column = ?
     ORDER BY h.created_at DESC
     LIMIT ?
   `);
-  const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string }>;
+  const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
   
   return rows.map(row => ({
     id: row.id,
@@ -239,7 +239,8 @@ export function getHeadlines(
     mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
-      pump_url: row.pump_url || ""
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
     } : undefined
   }));
 }
@@ -253,13 +254,13 @@ export function getAllHeadlines(limit: number = 100): Headline[] {
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       h.importance_score, h.mcafee_take,
-      t.ticker, t.pump_url
+      t.ticker, t.pump_url, t.image_url as token_image_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
     ORDER BY h.created_at DESC
     LIMIT ?
   `);
-  const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string }>;
+  const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
   
   return rows.map(row => ({
     id: row.id,
@@ -273,7 +274,8 @@ export function getAllHeadlines(limit: number = 100): Headline[] {
     mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
-      pump_url: row.pump_url || ""
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
     } : undefined
   }));
 }
@@ -325,12 +327,12 @@ export function getHeadlineById(id: number): Headline | undefined {
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       h.importance_score, h.mcafee_take,
-      t.ticker, t.pump_url
+      t.ticker, t.pump_url, t.image_url as token_image_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
     WHERE h.id = ?
   `);
-  const row = stmt.get(id) as (Headline & { ticker?: string; pump_url?: string }) | undefined;
+  const row = stmt.get(id) as (Headline & { ticker?: string; pump_url?: string; token_image_url?: string }) | undefined;
   
   if (!row) return undefined;
   
@@ -346,7 +348,8 @@ export function getHeadlineById(id: number): Headline | undefined {
     mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
-      pump_url: row.pump_url || ""
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
     } : undefined
   };
 }
@@ -389,7 +392,8 @@ export function getHeadlineWithDetails(id: number): (Headline & {
     mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
-      pump_url: row.pump_url || ""
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
     } : undefined,
     token_name: row.token_name || undefined,
     mint_address: row.mint_address || undefined,
@@ -1078,7 +1082,7 @@ export function getBreakingHeadline(
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       h.importance_score, h.mcafee_take,
-      t.ticker, t.pump_url
+      t.ticker, t.pump_url, t.image_url as token_image_url
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
     WHERE h.importance_score >= ?
@@ -1086,7 +1090,7 @@ export function getBreakingHeadline(
     ORDER BY h.importance_score DESC, h.created_at DESC
     LIMIT 1
   `);
-  const row = stmt.get(threshold, hours) as (Headline & { ticker?: string; pump_url?: string }) | undefined;
+  const row = stmt.get(threshold, hours) as (Headline & { ticker?: string; pump_url?: string; token_image_url?: string }) | undefined;
   if (!row) return undefined;
 
   return {
@@ -1101,7 +1105,8 @@ export function getBreakingHeadline(
     mcafee_take: row.mcafee_take || null,
     token: row.ticker ? {
       ticker: row.ticker,
-      pump_url: row.pump_url || ""
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
     } : undefined
   };
 }

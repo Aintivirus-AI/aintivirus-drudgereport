@@ -81,6 +81,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                 <TokenBadge 
                   pumpUrl={headline.token.pump_url} 
                   ticker={headline.token.ticker}
+                  imageUrl={headline.token.image_url}
                   priceChange={headline.token.price_change_24h}
                   size="sm"
                 />
@@ -130,6 +131,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
         <TokenBadge 
           pumpUrl={headline.token.pump_url} 
           ticker={headline.token.ticker}
+          imageUrl={headline.token.image_url}
           priceChange={headline.token.price_change_24h}
           showTicker={false}
           size="sm"

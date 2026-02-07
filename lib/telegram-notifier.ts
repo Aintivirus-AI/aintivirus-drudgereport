@@ -86,18 +86,19 @@ export async function notifySubmitterPublished(opts: {
   const safeHeadline = escapeTelegramMarkdown(headline);
 
   let message =
-    `🎉 *Your submission was PUBLISHED!*\n\n` +
-    `📰 ${safeHeadline}\n` +
-    `🔗 [View on The McAfee Report](${articleUrl})\n`;
+    `*Your submission is live*\n` +
+    `─────────────────────\n\n` +
+    `${safeHeadline}\n` +
+    `[View on The McAfee Report](${articleUrl})\n`;
 
   if (ticker && pumpUrl) {
     message +=
-      `\n💰 *Token launched: $${escapeTelegramMarkdown(ticker)}*\n` +
-      `🚀 [Trade on pump.fun](${pumpUrl})\n` +
-      `\n50% of creator fees go directly to YOUR wallet!`;
+      `\nToken launched: *$${escapeTelegramMarkdown(ticker)}*\n` +
+      `[Trade on pump\\.fun](${pumpUrl})\n` +
+      `\n50% of creator fees go to your wallet\\.`;
   }
 
-  message += `\n\n_Submission #${submissionId}_`;
+  message += `\n\n_Submission \\#${submissionId}_`;
 
   const sent = await sendTelegramMessage(telegramUserId, message);
   if (sent) {

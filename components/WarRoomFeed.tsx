@@ -1,6 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
+import {
+  InboxIcon,
+  SearchIcon,
+  ApprovedIcon,
+  RejectedIcon,
+  CoinIcon,
+  PublishIcon,
+  VoteIcon,
+  ClipboardIcon,
+} from "./Icons";
 
 interface ActivityEvent {
   id: number;
@@ -17,33 +27,25 @@ interface WarRoomStats {
   approvalRate: number;
 }
 
-const EVENT_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  submission_received: { icon: "📩", color: "#00D3FF", label: "SUBMISSION" },
-  validation_started: { icon: "🔍", color: "#f59e0b", label: "VALIDATING" },
-  approved: { icon: "✅", color: "#00ff9d", label: "APPROVED" },
-  rejected: { icon: "❌", color: "#ef4444", label: "REJECTED" },
-  token_minted: { icon: "🪙", color: "#bf5af2", label: "TOKEN MINTED" },
-  headline_published: { icon: "📰", color: "#00D3FF", label: "PUBLISHED" },
-  vote_cast: { icon: "🗳️", color: "#6366f1", label: "VOTE" },
+const EVENT_CONFIG: Record<string, { icon: ReactNode; color: string }> = {
+  submission_received: { icon: <InboxIcon />, color: "#00D3FF" },
+  validation_started: { icon: <SearchIcon />, color: "#f59e0b" },
+  approved: { icon: <ApprovedIcon />, color: "#00ff9d" },
+  rejected: { icon: <RejectedIcon />, color: "#ef4444" },
+  token_minted: { icon: <CoinIcon />, color: "#bf5af2" },
+  headline_published: { icon: <PublishIcon />, color: "#00D3FF" },
+  vote_cast: { icon: <VoteIcon />, color: "#6366f1" },
 };
 
-function formatTimestamp(dateStr: string): string {
+const DEFAULT_EVENT = { icon: <ClipboardIcon />, color: "#9ca3af" };
+
+function formatTime(dateStr: string): string {
   const date = new Date(dateStr + "Z");
   return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     hour12: false,
   });
-}
-
-function StatCard({ label, value, color }: { label: string; value: number | string; color: string }) {
-  return (
-    <div className="warroom-stat">
-      <div className="warroom-stat-value" style={{ color }}>{value}</div>
-      <div className="warroom-stat-label">{label}</div>
-    </div>
-  );
 }
 
 export function WarRoomFeed() {
@@ -51,30 +53,24 @@ export function WarRoomFeed() {
   const [stats, setStats] = useState<WarRoomStats | null>(null);
   const [connected, setConnected] = useState(false);
   const lastIdRef = useRef<number>(0);
-  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         const url = lastIdRef.current > 0
-          ? `/api/war-room?after=${lastIdRef.current}`
-          : "/api/war-room";
+          ? `/api/war-room?after=${lastIdRef.current}&limit=20`
+          : "/api/war-room?limit=20";
         
         const res = await fetch(url);
         const data = await res.json();
 
         if (data.events && data.events.length > 0) {
-          // Events come in DESC order from API, we want newest at top
           const newEvents = data.events.filter(
             (e: ActivityEvent) => e.id > lastIdRef.current
           );
           
           if (newEvents.length > 0) {
-            setEvents(prev => {
-              const combined = [...newEvents, ...prev].slice(0, 200);
-              return combined;
-            });
-            // Update lastId to the highest ID we've seen
+            setEvents(prev => [...newEvents, ...prev].slice(0, 50));
             const maxId = Math.max(...newEvents.map((e: ActivityEvent) => e.id));
             if (maxId > lastIdRef.current) {
               lastIdRef.current = maxId;
@@ -82,10 +78,7 @@ export function WarRoomFeed() {
           }
         }
 
-        if (data.stats) {
-          setStats(data.stats);
-        }
-
+        if (data.stats) setStats(data.stats);
         setConnected(true);
       } catch {
         setConnected(false);
@@ -93,62 +86,53 @@ export function WarRoomFeed() {
     };
 
     fetchEvents();
-    const interval = setInterval(fetchEvents, 3000);
+    const interval = setInterval(fetchEvents, 5000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="warroom">
-      {/* Status indicator */}
-      <div className="warroom-status">
-        <div className={`warroom-status-dot ${connected ? "warroom-status-connected" : "warroom-status-disconnected"}`} />
-        <span>{connected ? "LIVE" : "RECONNECTING..."}</span>
-      </div>
-
-      {/* Stats dashboard */}
+    <div className="warroom-mini">
+      {/* Inline stats row */}
       {stats && (
-        <div className="warroom-stats">
-          <StatCard label="SUBMISSIONS TODAY" value={stats.submissionsToday} color="#00D3FF" />
-          <StatCard label="TOKENS LAUNCHED" value={stats.tokensLaunchedToday} color="#bf5af2" />
-          <StatCard label="VOTES CAST" value={stats.votesToday} color="#6366f1" />
-          <StatCard label="APPROVAL RATE" value={`${stats.approvalRate}%`} color="#00ff9d" />
+        <div className="warroom-mini-stats">
+          <span className="warroom-mini-stat">
+            <span className="warroom-mini-stat-val" style={{ color: "#00D3FF" }}>{stats.submissionsToday}</span> subs
+          </span>
+          <span className="warroom-mini-stat-sep" />
+          <span className="warroom-mini-stat">
+            <span className="warroom-mini-stat-val" style={{ color: "#bf5af2" }}>{stats.tokensLaunchedToday}</span> tokens
+          </span>
+          <span className="warroom-mini-stat-sep" />
+          <span className="warroom-mini-stat">
+            <span className="warroom-mini-stat-val" style={{ color: "#6366f1" }}>{stats.votesToday}</span> votes
+          </span>
+          <span className="warroom-mini-stat-sep" />
+          <span className="warroom-mini-stat">
+            <span className="warroom-mini-stat-val" style={{ color: "#00ff9d" }}>{stats.approvalRate}%</span> approved
+          </span>
+          <div className="warroom-mini-live">
+            <span className={`warroom-mini-live-dot ${connected ? "connected" : ""}`} />
+            {connected ? "LIVE" : "..."}
+          </div>
         </div>
       )}
 
-      {/* Event feed */}
-      <div className="warroom-feed" ref={feedRef}>
+      {/* Compact event feed */}
+      <div className="warroom-mini-feed">
         {events.length === 0 ? (
-          <div className="warroom-empty">
-            <p>Waiting for activity...</p>
-            <p className="warroom-empty-sub">Events will appear here in real-time as they happen.</p>
-          </div>
+          <div className="warroom-mini-empty">Waiting for activity...</div>
         ) : (
-          events.map((event, index) => {
-            const config = EVENT_CONFIG[event.event_type] || {
-              icon: "📋",
-              color: "#9ca3af",
-              label: event.event_type.toUpperCase(),
-            };
-
+          events.map((event) => {
+            const config = EVENT_CONFIG[event.event_type] || DEFAULT_EVENT;
             return (
               <div
                 key={event.id}
-                className="warroom-event"
-                style={{
-                  animationDelay: `${Math.min(index * 50, 500)}ms`,
-                  borderLeftColor: config.color,
-                }}
+                className="warroom-mini-event"
+                style={{ borderLeftColor: config.color }}
               >
-                <div className="warroom-event-header">
-                  <span className="warroom-event-icon">{config.icon}</span>
-                  <span className="warroom-event-label" style={{ color: config.color }}>
-                    {config.label}
-                  </span>
-                  <span className="warroom-event-time">
-                    {formatTimestamp(event.created_at)}
-                  </span>
-                </div>
-                <div className="warroom-event-message">{event.message}</div>
+                <span className="warroom-mini-event-icon">{config.icon}</span>
+                <span className="warroom-mini-event-msg">{event.message}</span>
+                <span className="warroom-mini-event-time">{formatTime(event.created_at)}</span>
               </div>
             );
           })

@@ -14,13 +14,13 @@ for (const envPath of envPaths) {
   const result = config({ path: envPath });
   if (!result.error) {
     envLoaded = true;
-    console.log(`✅ Loaded environment from: ${envPath}`);
+    console.log(`Loaded environment from: ${envPath}`);
     break;
   }
 }
 
 if (!envLoaded) {
-  console.warn("⚠️  Could not load .env.local, trying default .env");
+  console.warn("Could not load .env.local, trying default .env");
   config(); // Try default .env
 }
 
@@ -65,17 +65,17 @@ const ADMIN_IDS = (process.env.ADMIN_TELEGRAM_IDS || "").split(",").filter(Boole
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!BOT_TOKEN) {
-  console.error("❌ TELEGRAM_BOT_TOKEN is required");
+  console.error("TELEGRAM_BOT_TOKEN is required");
   process.exit(1);
 }
 
 if (!API_SECRET) {
-  console.error("❌ API_SECRET_KEY is required");
+  console.error("API_SECRET_KEY is required");
   process.exit(1);
 }
 
 if (!OPENAI_API_KEY) {
-  console.error("❌ OPENAI_API_KEY is required");
+  console.error("OPENAI_API_KEY is required");
   process.exit(1);
 }
 
@@ -621,18 +621,34 @@ function resetSession(session: SessionData) {
   session.pendingSolAddress = undefined;
 }
 
-// Helper: Get content type emoji
-function getContentTypeEmoji(contentType: string): string {
+// Helper: Format content type as readable label
+function contentTypeLabel(contentType: string): string {
   switch (contentType) {
-    case "tweet": return "🐦";
-    case "youtube": return "📺";
-    case "tiktok": return "🎵";
-    case "article": return "📰";
-    default: return "🔗";
+    case "tweet": return "Tweet";
+    case "youtube": return "YouTube";
+    case "tiktok": return "TikTok";
+    case "article": return "Article";
+    default: return "Link";
   }
 }
 
-// Command: /start
+// Helper: Format status as readable label
+function statusLabel(status: string): string {
+  switch (status) {
+    case "pending": return "Pending";
+    case "validating": return "Validating";
+    case "approved": return "Approved";
+    case "rejected": return "Rejected";
+    case "published": return "Published";
+    default: return status;
+  }
+}
+
+// ============================================================
+//  COMMANDS
+// ============================================================
+
+// /start
 bot.command("start", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId) return;
@@ -640,163 +656,165 @@ bot.command("start", async (ctx) => {
   const authorized = isAuthorized(userId);
   const admin = isAdmin(userId);
 
-  let message = `🌐 *THE MCAFEE REPORT Bot*\n\n`;
-  
-  // Public commands available to everyone
-  message += `*Submit Breaking News:*\n`;
-  message += `/submit - Submit a news link (earn rewards!)\n`;
-  message += `/mystatus - Check your submission status\n\n`;
-  
+  let msg = `*THE MCAFEE REPORT*\n`;
+  msg += `─────────────────────\n\n`;
+
+  msg += `*Public*\n`;
+  msg += `/submit  — Submit a news link\n`;
+  msg += `/mystatus — Your submissions\n\n`;
+
   if (authorized) {
-    message += `You are ${admin ? "an *admin*" : "a *whitelisted editor*"}.\n\n`;
-    message += `*Editor Commands:*\n`;
-    message += `/add - Add a new headline (AI-generated)\n`;
-    message += `/main - Set the main headline\n`;
-    message += `/cotd - Set Coin Of The Day\n`;
-    message += `/list - View recent headlines\n`;
-    message += `/remove - Remove a headline\n`;
-    
+    msg += `*Editor* (${admin ? "admin" : "whitelisted"})\n`;
+    msg += `/add  — Add headline (AI-generated)\n`;
+    msg += `/main — Set main headline\n`;
+    msg += `/cotd — Set Coin of the Day\n`;
+    msg += `/list — Recent headlines\n`;
+    msg += `/remove — Remove a headline\n`;
+
     if (admin) {
-      message += `\n*Admin Commands:*\n`;
-      message += `/whitelist - View whitelisted users\n`;
-      message += `/adduser <id> - Add user to whitelist\n`;
-      message += `/removeuser <id> - Remove user from whitelist\n`;
-      message += `/queue - View submission queue\n`;
+      msg += `\n*Admin*\n`;
+      msg += `/whitelist — View whitelist\n`;
+      msg += `/adduser — Add to whitelist\n`;
+      msg += `/removeuser — Remove from whitelist\n`;
+      msg += `/queue — Submission queue\n`;
     }
   }
-  
-  message += `\n/help - Show all commands`;
 
-  await ctx.reply(message, { parse_mode: "Markdown" });
+  msg += `\n/help — Full command reference`;
+
+  await ctx.reply(msg, { parse_mode: "Markdown" });
 });
 
-// Command: /help
+// /help
 bot.command("help", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId) return;
 
   const authorized = isAuthorized(userId);
   const admin = isAdmin(userId);
-  
-  let message = `📖 *THE MCAFEE REPORT Bot Help*\n\n`;
-  
-  message += `*🌍 Public Commands (Everyone):*\n`;
-  message += `/submit - Submit breaking news to earn rewards\n`;
-  message += `  • Submit articles, tweets, YouTube, TikTok\n`;
-  message += `  • If published, a token launches on pump.fun\n`;
-  message += `  • 50% of creator fees go to YOU!\n`;
-  message += `/mystatus - Check your submission history\n`;
-  message += `/cancel - Cancel current operation\n`;
+
+  let msg = `*COMMAND REFERENCE*\n`;
+  msg += `─────────────────────\n\n`;
+
+  msg += `*Public Commands*\n`;
+  msg += `/submit — Submit breaking news\n`;
+  msg += `  Accepts articles, tweets, YouTube, TikTok.\n`;
+  msg += `  Approved stories launch a token on pump.fun.\n`;
+  msg += `  You receive 50% of creator fees.\n`;
+  msg += `/mystatus — View your submission history\n`;
+  msg += `/cancel — Cancel current operation\n`;
 
   if (authorized) {
-    message += `\n*✏️ Editor Commands:*\n`;
-    message += `/add - Send a URL and AI generates headline options\n`;
-    message += `/main - Set the main/center headline\n`;
-    message += `/cotd - Set Coin Of The Day (no pump.fun coin)\n`;
-    message += `/list - View recent headlines with IDs\n`;
-    message += `/remove <id> - Remove a headline by ID\n`;
+    msg += `\n*Editor Commands*\n`;
+    msg += `/add — Send a URL, AI generates headline options\n`;
+    msg += `/main — Set the main/center headline\n`;
+    msg += `/cotd — Set Coin of the Day (no token created)\n`;
+    msg += `/list — View recent headlines with IDs\n`;
+    msg += `/remove <id> — Remove a headline by ID\n`;
   }
 
   if (admin) {
-    message += `\n*👮 Admin Commands:*\n`;
-    message += `/whitelist - View all whitelisted users\n`;
-    message += `/adduser <telegram_id> [username] - Add to whitelist\n`;
-    message += `/removeuser <telegram_id> - Remove from whitelist\n`;
-    message += `/queue - View pending submissions queue\n`;
+    msg += `\n*Admin Commands*\n`;
+    msg += `/whitelist — View all whitelisted users\n`;
+    msg += `/adduser <id> [username] — Add to whitelist\n`;
+    msg += `/removeuser <id> — Remove from whitelist\n`;
+    msg += `/queue — View pending submission queue\n`;
   }
 
-  message += `\n*Website:* ${API_URL}`;
+  msg += `\n${API_URL}`;
 
-  await ctx.reply(message, { parse_mode: "Markdown" });
+  await ctx.reply(msg, { parse_mode: "Markdown" });
 });
 
-// Command: /add - Start adding headline flow
+// /add
 bot.command("add", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAuthorized(userId)) {
-    await ctx.reply("⚠️ You are not authorized to use this bot.");
+    await ctx.reply("Not authorized.");
     return;
   }
 
   ctx.session.step = "awaiting_url";
   await ctx.reply(
-    "📝 *Add New Headline*\n\nSend me the article URL and I'll generate headline options for you:",
+    `*Add Headline*\n\nSend the article URL:`,
     { parse_mode: "Markdown" }
   );
 });
 
-// Command: /main - Set main headline
+// /main
 bot.command("main", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAuthorized(userId)) {
-    await ctx.reply("⚠️ You are not authorized to use this bot.");
+    await ctx.reply("Not authorized.");
     return;
   }
 
   ctx.session.step = "awaiting_main_url";
   await ctx.reply(
-    "🎯 *Set Main Headline*\n\nSend me the article URL:",
+    `*Set Main Headline*\n\nSend the article URL:`,
     { parse_mode: "Markdown" }
   );
 });
 
-// Command: /cotd - Set coin of the day
+// /cotd
 bot.command("cotd", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAuthorized(userId)) {
-    await ctx.reply("⚠️ You are not authorized to use this bot.");
+    await ctx.reply("Not authorized.");
     return;
   }
 
   ctx.session.step = "awaiting_cotd_url";
   await ctx.reply(
-    "⭐ *Set Coin Of The Day*\n\nSend me the project URL (this link will NOT create a pump.fun coin):",
+    `*Set Coin of the Day*\n\nSend the project URL (no pump.fun token will be created):`,
     { parse_mode: "Markdown" }
   );
 });
 
-// Command: /list - Show recent headlines
+// /list
 bot.command("list", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAuthorized(userId)) {
-    await ctx.reply("⚠️ You are not authorized to use this bot.");
+    await ctx.reply("Not authorized.");
     return;
   }
 
   try {
     const headlines = getAllHeadlines(20);
-    
+
     if (headlines.length === 0) {
-      await ctx.reply("📭 No headlines found.");
+      await ctx.reply("No headlines found.");
       return;
     }
 
-    let message = "📰 *Recent Headlines:*\n\n";
+    let msg = `*Recent Headlines*\n`;
+    msg += `─────────────────────\n\n`;
     for (const h of headlines) {
-      const columnEmoji = h.column === "left" ? "◀️" : h.column === "right" ? "▶️" : "⭐";
-      const imgEmoji = h.image_url ? "🖼️" : "";
-      message += `${columnEmoji}${imgEmoji} \`${h.id}\` - ${h.title.substring(0, 35)}${h.title.length > 35 ? "..." : ""}\n`;
+      const col = h.column === "left" ? "L" : h.column === "right" ? "R" : "C";
+      const img = h.image_url ? " [img]" : "";
+      const title = h.title.length > 40 ? h.title.substring(0, 37) + "..." : h.title;
+      msg += `\`${h.id}\` [${col}]${img} ${title}\n`;
     }
 
-    await ctx.reply(message, { parse_mode: "Markdown" });
+    await ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (error) {
     console.error("Error listing headlines:", error);
-    await ctx.reply("❌ Failed to fetch headlines.");
+    await ctx.reply("Failed to fetch headlines.");
   }
 });
 
-// Command: /remove - Remove a headline
+// /remove
 bot.command("remove", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAuthorized(userId)) {
-    await ctx.reply("⚠️ You are not authorized to use this bot.");
+    await ctx.reply("Not authorized.");
     return;
   }
 
   const args = ctx.message?.text?.split(" ").slice(1);
   if (!args || args.length === 0) {
     await ctx.reply(
-      "Usage: `/remove <id>`\n\nUse `/list` to see headline IDs.",
+      "Usage: `/remove <id>`\nUse `/list` to see IDs.",
       { parse_mode: "Markdown" }
     );
     return;
@@ -804,111 +822,106 @@ bot.command("remove", async (ctx) => {
 
   const id = parseInt(args[0], 10);
   if (isNaN(id)) {
-    await ctx.reply("❌ Invalid ID. Please provide a number.");
+    await ctx.reply("Invalid ID. Provide a number.");
     return;
   }
 
   try {
     const deleted = removeHeadline(id);
     if (deleted) {
-      await ctx.reply(`✅ Headline #${id} has been removed.`);
+      await ctx.reply(`Removed headline #${id}.`);
     } else {
-      await ctx.reply(`❌ Headline #${id} not found.`);
+      await ctx.reply(`Headline #${id} not found.`);
     }
   } catch (error) {
     console.error("Error removing headline:", error);
-    await ctx.reply("❌ Failed to remove headline.");
+    await ctx.reply("Failed to remove headline.");
   }
 });
 
-// Command: /cancel - Cancel current operation
+// /cancel
 bot.command("cancel", async (ctx) => {
   resetSession(ctx.session);
-  await ctx.reply("❌ Operation cancelled.");
+  await ctx.reply("Cancelled.");
 });
 
-// ============= PUBLIC SUBMISSION COMMANDS =============
+// ============================================================
+//  PUBLIC SUBMISSION COMMANDS
+// ============================================================
 
-// Command: /submit - Start public submission flow (available to everyone)
+// /submit
 bot.command("submit", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId) return;
 
   ctx.session.step = "awaiting_submit_url";
-  
+
   const pendingCount = getPendingSubmissionsCount();
-  
+
   await ctx.reply(
-    `🚀 *Submit Breaking News*\n\n` +
-    `Submit a link to breaking news and earn rewards!\n\n` +
-    `*How it works:*\n` +
-    `1️⃣ Send me a news link (article, tweet, YouTube, TikTok)\n` +
-    `2️⃣ Provide your Solana wallet address\n` +
-    `3️⃣ Our AI reviews your submission\n` +
-    `4️⃣ If approved, a token launches on pump.fun!\n` +
-    `5️⃣ You get 50% of creator fees 💰\n\n` +
-    `*Requirements:*\n` +
-    `• News must be real and verifiable\n` +
-    `• Must be breaking (less than 2 hours old)\n` +
-    `• Must not be a duplicate\n\n` +
-    `📊 Current queue: ${pendingCount} submissions\n\n` +
-    `Send me the URL now:`,
+    `*Submit Breaking News*\n` +
+    `─────────────────────\n\n` +
+    `Send a news link to earn rewards.\n\n` +
+    `*Process:*\n` +
+    `1. Send a URL (article, tweet, YouTube, TikTok)\n` +
+    `2. Provide your Solana wallet address\n` +
+    `3. AI reviews your submission\n` +
+    `4. If approved, a token launches on pump.fun\n` +
+    `5. You receive 50% of creator fees\n\n` +
+    `*Rules:*\n` +
+    `- Must be real, verifiable news\n` +
+    `- Must be recent (under 2 hours old)\n` +
+    `- No duplicates\n\n` +
+    `Queue: ${pendingCount} pending\n\n` +
+    `Send the URL:`,
     { parse_mode: "Markdown" }
   );
 });
 
-// Command: /mystatus - Check submission status
+// /mystatus
 bot.command("mystatus", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId) return;
 
   try {
     const submissions = getSubmissionsByUser(userId.toString(), 10);
-    
+
     if (submissions.length === 0) {
       await ctx.reply(
-        `📭 *No submissions yet*\n\n` +
-        `Use /submit to submit your first breaking news link!`,
+        `*No Submissions*\n\nUse /submit to send your first news link.`,
         { parse_mode: "Markdown" }
       );
       return;
     }
 
-    let message = `📊 *Your Recent Submissions:*\n\n`;
-    
+    let msg = `*Your Submissions*\n`;
+    msg += `─────────────────────\n\n`;
+
     for (const sub of submissions) {
-      const emoji = getContentTypeEmoji(sub.content_type);
-      const statusEmoji = {
-        pending: "⏳",
-        validating: "🔍",
-        approved: "✅",
-        rejected: "❌",
-        published: "🎉",
-      }[sub.status] || "❓";
-      
-      const shortUrl = sub.url.length > 30 ? sub.url.substring(0, 30) + "..." : sub.url;
-      
-      message += `${emoji} ${statusEmoji} \`#${sub.id}\`\n`;
-      message += `   \`${shortUrl}\`\n`;
-      message += `   Status: *${sub.status}*`;
+      const type = contentTypeLabel(sub.content_type);
+      const status = statusLabel(sub.status);
+      const shortUrl = sub.url.length > 35 ? sub.url.substring(0, 32) + "..." : sub.url;
+
+      msg += `\`#${sub.id}\` — *${status}*\n`;
+      msg += `${type}: \`${shortUrl}\`\n`;
       if (sub.rejection_reason) {
-        message += ` - ${sub.rejection_reason}`;
+        msg += `Reason: ${sub.rejection_reason}\n`;
       }
-      message += `\n\n`;
+      msg += `\n`;
     }
 
-    await ctx.reply(message, { parse_mode: "Markdown" });
+    await ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (error) {
     console.error("Error fetching submissions:", error);
-    await ctx.reply("❌ Failed to fetch your submissions. Please try again.");
+    await ctx.reply("Failed to fetch submissions. Try again.");
   }
 });
 
-// Admin Command: /queue - View pending submissions
+// /queue (admin)
 bot.command("queue", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAdmin(userId)) {
-    await ctx.reply("⚠️ This command is only available to admins.");
+    await ctx.reply("Admin only.");
     return;
   }
 
@@ -917,75 +930,74 @@ bot.command("queue", async (ctx) => {
     const pending = getSubmissionsByStatus("pending", 20);
     const validating = getSubmissionsByStatus("validating", 10);
     const approved = getSubmissionsByStatus("approved", 10);
-    
-    let message = `📋 *Submission Queue*\n\n`;
-    
-    message += `*Pending (${pending.length}):*\n`;
+
+    let msg = `*Submission Queue*\n`;
+    msg += `─────────────────────\n\n`;
+
+    msg += `*Pending* (${pending.length})\n`;
     if (pending.length === 0) {
-      message += `  No pending submissions\n`;
+      msg += `  None\n`;
     } else {
       for (const sub of pending.slice(0, 5)) {
-        const emoji = getContentTypeEmoji(sub.content_type);
-        message += `  ${emoji} \`#${sub.id}\` - \`${sub.url.substring(0, 25)}...\`\n`;
+        msg += `  \`#${sub.id}\` \`${sub.url.substring(0, 30)}...\`\n`;
       }
-      if (pending.length > 5) {
-        message += `  ... and ${pending.length - 5} more\n`;
-      }
+      if (pending.length > 5) msg += `  +${pending.length - 5} more\n`;
     }
-    
-    message += `\n*Validating (${validating.length}):*\n`;
+
+    msg += `\n*Validating* (${validating.length})\n`;
     if (validating.length === 0) {
-      message += `  None currently validating\n`;
+      msg += `  None\n`;
     } else {
       for (const sub of validating.slice(0, 3)) {
-        message += `  🔍 \`#${sub.id}\` - \`${sub.url.substring(0, 25)}...\`\n`;
-      }
-    }
-    
-    message += `\n*Approved & Waiting (${approved.length}):*\n`;
-    if (approved.length === 0) {
-      message += `  No approved submissions waiting\n`;
-    } else {
-      for (const sub of approved.slice(0, 3)) {
-        message += `  ✅ \`#${sub.id}\` - \`${sub.url.substring(0, 25)}...\`\n`;
+        msg += `  \`#${sub.id}\` \`${sub.url.substring(0, 30)}...\`\n`;
       }
     }
 
-    await ctx.reply(message, { parse_mode: "Markdown" });
+    msg += `\n*Approved, waiting* (${approved.length})\n`;
+    if (approved.length === 0) {
+      msg += `  None\n`;
+    } else {
+      for (const sub of approved.slice(0, 3)) {
+        msg += `  \`#${sub.id}\` \`${sub.url.substring(0, 30)}...\`\n`;
+      }
+    }
+
+    await ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (error) {
     console.error("Error fetching queue:", error);
-    await ctx.reply("❌ Failed to fetch submission queue.");
+    await ctx.reply("Failed to fetch queue.");
   }
 });
 
-// Admin Command: /whitelist
+// /whitelist (admin)
 bot.command("whitelist", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAdmin(userId)) {
-    await ctx.reply("⚠️ This command is only available to admins.");
+    await ctx.reply("Admin only.");
     return;
   }
 
   const users = getWhitelist();
-  
+
   if (users.length === 0) {
-    await ctx.reply("📭 No whitelisted users.");
+    await ctx.reply("Whitelist is empty.");
     return;
   }
 
-  let message = "👥 *Whitelisted Users:*\n\n";
+  let msg = `*Whitelisted Users*\n`;
+  msg += `─────────────────────\n\n`;
   for (const user of users) {
-    message += `• \`${user.telegram_id}\`${user.username ? ` (@${user.username})` : ""}\n`;
+    msg += `\`${user.telegram_id}\`${user.username ? ` @${user.username}` : ""}\n`;
   }
 
-  await ctx.reply(message, { parse_mode: "Markdown" });
+  await ctx.reply(msg, { parse_mode: "Markdown" });
 });
 
-// Admin Command: /adduser
+// /adduser (admin)
 bot.command("adduser", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAdmin(userId)) {
-    await ctx.reply("⚠️ This command is only available to admins.");
+    await ctx.reply("Admin only.");
     return;
   }
 
@@ -1002,20 +1014,20 @@ bot.command("adduser", async (ctx) => {
 
   try {
     addToWhitelist(telegramId, username);
-    await ctx.reply(`✅ User \`${telegramId}\` has been added to the whitelist.`, {
+    await ctx.reply(`Added \`${telegramId}\` to whitelist.`, {
       parse_mode: "Markdown",
     });
   } catch (error) {
     console.error("Error adding to whitelist:", error);
-    await ctx.reply("❌ Failed to add user to whitelist.");
+    await ctx.reply("Failed to add user.");
   }
 });
 
-// Admin Command: /removeuser
+// /removeuser (admin)
 bot.command("removeuser", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId || !isAdmin(userId)) {
-    await ctx.reply("⚠️ This command is only available to admins.");
+    await ctx.reply("Admin only.");
     return;
   }
 
@@ -1032,19 +1044,24 @@ bot.command("removeuser", async (ctx) => {
   try {
     const removed = removeFromWhitelist(telegramId);
     if (removed) {
-      await ctx.reply(`✅ User \`${telegramId}\` has been removed from the whitelist.`, {
+      await ctx.reply(`Removed \`${telegramId}\` from whitelist.`, {
         parse_mode: "Markdown",
       });
     } else {
-      await ctx.reply(`❌ User \`${telegramId}\` not found in whitelist.`);
+      await ctx.reply(`\`${telegramId}\` not found in whitelist.`, {
+        parse_mode: "Markdown",
+      });
     }
   } catch (error) {
     console.error("Error removing from whitelist:", error);
-    await ctx.reply("❌ Failed to remove user from whitelist.");
+    await ctx.reply("Failed to remove user.");
   }
 });
 
-// Handle text messages for interactive flows
+// ============================================================
+//  MESSAGE HANDLER (interactive flows)
+// ============================================================
+
 bot.on("message:text", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId) return;
@@ -1052,76 +1069,66 @@ bot.on("message:text", async (ctx) => {
   const text = ctx.message.text;
   const session = ctx.session;
 
-  // ============= PUBLIC SUBMISSION FLOW =============
+  // ---- PUBLIC SUBMISSION FLOW ----
 
   if (session.step === "awaiting_submit_url") {
-    // Validate URL format
     try {
       new URL(text);
     } catch {
-      await ctx.reply("❌ Invalid URL. Please send a valid URL:");
+      await ctx.reply("Invalid URL. Send a valid link:");
       return;
     }
 
-    // SSRF check – reject URLs pointing to internal/private resources
     const urlCheck = isUrlSafe(text);
     if (!urlCheck.safe) {
-      await ctx.reply(`❌ URL not allowed: ${urlCheck.reason}`);
+      await ctx.reply(`URL not allowed: ${urlCheck.reason}`);
       return;
     }
 
     session.pendingUrl = text;
     session.step = "awaiting_sol_address";
-    
+
     const contentType = detectContentType(text);
-    const emoji = getContentTypeEmoji(contentType);
-    
+
     await ctx.reply(
-      `${emoji} *Link received!*\n\n` +
-      `Type: ${contentType}\n` +
+      `*Link received*\n\n` +
+      `Type: ${contentTypeLabel(contentType)}\n` +
       `URL: \`${text.substring(0, 50)}${text.length > 50 ? "..." : ""}\`\n\n` +
-      `Now send me your *Solana wallet address* to receive rewards:`,
+      `Send your *Solana wallet address*:`,
       { parse_mode: "Markdown" }
     );
     return;
   }
 
   if (session.step === "awaiting_sol_address") {
-    // Validate Solana address
     if (!isValidSolanaAddress(text)) {
       await ctx.reply(
-        "❌ Invalid Solana address.\n\n" +
-        "Please send a valid Solana wallet address (32-44 characters, base58 encoded):"
+        "Invalid Solana address.\n\nSend a valid wallet address (base58, 32-44 chars):"
       );
       return;
     }
 
     session.pendingSolAddress = text;
-    
-    // Rate limiting: max 5 submissions per hour per user
+
     const recentCount = getRecentSubmissionCountByUser(userId.toString(), 1);
     if (recentCount >= 5) {
       await ctx.reply(
-        "⏳ *Rate limit reached*\n\n" +
-        "You can submit up to 5 links per hour. Please wait and try again.",
+        `*Rate limit*\n\nMax 5 submissions per hour. Try again later.`,
         { parse_mode: "Markdown" }
       );
       resetSession(session);
       return;
     }
 
-    // URL duplicate check – reject if same URL was recently submitted
     const existingSubmission = getRecentSubmissionByUrl(session.pendingUrl!, 48);
     if (existingSubmission) {
       await ctx.reply(
-        `❌ This URL was already submitted recently (Submission #${existingSubmission.id}).\n\n` +
-        "Please submit a different link."
+        `This URL was already submitted (submission #${existingSubmission.id}).\nSend a different link.`
       );
       resetSession(session);
       return;
     }
 
-    // Create the submission
     try {
       const contentType = detectContentType(session.pendingUrl!);
       const submission = createSubmission(
@@ -1131,33 +1138,35 @@ bot.on("message:text", async (ctx) => {
         contentType,
         ctx.from?.username
       );
-      
+
       const pendingCount = getPendingSubmissionsCount();
-      
+      const walletShort = `${text.substring(0, 6)}...${text.substring(text.length - 4)}`;
+
       await ctx.reply(
-        `✅ *Submission received!*\n\n` +
-        `📋 Submission ID: \`#${submission.id}\`\n` +
-        `🔗 URL: \`${session.pendingUrl!.substring(0, 40)}...\`\n` +
-        `💰 Rewards to: \`${text.substring(0, 8)}...${text.substring(text.length - 4)}\`\n\n` +
-        `*What happens next:*\n` +
-        `1️⃣ Our AI will analyze your submission\n` +
-        `2️⃣ If approved, it enters the publishing queue\n` +
-        `3️⃣ When published, a token launches!\n` +
-        `4️⃣ You'll receive 50% of creator fees\n\n` +
-        `📊 Queue position: ~${pendingCount}\n\n` +
-        `Use /mystatus to check your submission status.`,
+        `*Submission Received*\n` +
+        `─────────────────────\n\n` +
+        `ID: \`#${submission.id}\`\n` +
+        `URL: \`${session.pendingUrl!.substring(0, 40)}...\`\n` +
+        `Wallet: \`${walletShort}\`\n` +
+        `Queue position: ~${pendingCount}\n\n` +
+        `*Next steps:*\n` +
+        `1. AI reviews your submission\n` +
+        `2. If approved, enters publishing queue\n` +
+        `3. On publish, a token launches\n` +
+        `4. You receive 50% of creator fees\n\n` +
+        `Use /mystatus to check progress.`,
         { parse_mode: "Markdown" }
       );
-      
-      // Notify admins of new submission
+
+      // Notify admins
       for (const adminId of ADMIN_IDS) {
         try {
           await bot.api.sendMessage(
             adminId,
-            `🆕 *New Submission*\n\n` +
+            `*New Submission*\n\n` +
             `ID: \`#${submission.id}\`\n` +
             `From: ${ctx.from?.username ? `@${ctx.from.username}` : userId}\n` +
-            `Type: ${contentType}\n` +
+            `Type: ${contentTypeLabel(contentType)}\n` +
             `URL: \`${session.pendingUrl!.substring(0, 50)}...\``,
             { parse_mode: "Markdown" }
           );
@@ -1167,20 +1176,20 @@ bot.on("message:text", async (ctx) => {
       }
     } catch (error) {
       console.error("Error creating submission:", error);
-      await ctx.reply("❌ Failed to create submission. Please try again with /submit");
+      await ctx.reply("Failed to create submission. Try again with /submit");
     }
-    
+
     resetSession(session);
     return;
   }
 
-  // ============= EDITOR FLOWS (require authorization) =============
+  // ---- EDITOR FLOWS ----
 
   if (!isAuthorized(userId)) {
     return;
   }
 
-  // Handle /skip command for COTD description step
+  // Handle /skip for COTD description
   if (text === "/skip" && session.step === "awaiting_cotd_description") {
     try {
       const response = await apiRequest("/coin-of-the-day", "PUT", {
@@ -1191,12 +1200,13 @@ bot.on("message:text", async (ctx) => {
 
       if (response.ok) {
         await ctx.reply(
-          `✅ *Coin Of The Day updated!*\n\n` +
-          `⭐ ${escapeMarkdown(session.pendingTitle || "")}\n` +
-          `🔗 \`${session.pendingUrl || ""}\`\n` +
-          `${session.includeImage ? "🖼️ With image\n" : ""}` +
-          `\n_No pump.fun coin will be created._\n` +
-          `\nView it at: ${API_URL}`,
+          `*Coin of the Day updated*\n` +
+          `─────────────────────\n\n` +
+          `Title: ${escapeMarkdown(session.pendingTitle || "")}\n` +
+          `URL: \`${session.pendingUrl || ""}\`\n` +
+          `${session.includeImage ? "Image: included\n" : ""}` +
+          `\n_No pump.fun token created._\n` +
+          `\n${API_URL}`,
           { parse_mode: "Markdown" }
         );
       } else {
@@ -1205,32 +1215,31 @@ bot.on("message:text", async (ctx) => {
       }
     } catch (error) {
       console.error("Error setting coin of the day:", error);
-      await ctx.reply("❌ Failed to set Coin Of The Day. Please try again.");
+      await ctx.reply("Failed to set Coin of the Day. Try again.");
     }
 
     resetSession(session);
     return;
   }
 
-  // Handle /skip command for subtitle step
+  // Handle /skip for subtitle
   if (text === "/skip" && session.step === "awaiting_main_subtitle") {
-    const subtitle = undefined;
-    
     try {
       const response = await apiRequest("/main-headline", "PUT", {
         title: session.pendingTitle,
         url: session.pendingUrl,
-        subtitle,
+        subtitle: undefined,
         image_url: session.includeImage ? session.pendingImageUrl : undefined,
       });
 
       if (response.ok) {
         await ctx.reply(
-          `✅ *Main headline updated!*\n\n` +
-          `📰 ${escapeMarkdown(session.pendingTitle || "")}\n` +
-          `🔗 \`${session.pendingUrl || ""}\`\n` +
-          `${session.includeImage ? "🖼️ With thumbnail\n" : ""}` +
-          `\nView it at: ${API_URL}`,
+          `*Main headline updated*\n` +
+          `─────────────────────\n\n` +
+          `${escapeMarkdown(session.pendingTitle || "")}\n` +
+          `URL: \`${session.pendingUrl || ""}\`\n` +
+          `${session.includeImage ? "Image: included\n" : ""}` +
+          `\n${API_URL}`,
           { parse_mode: "Markdown" }
         );
       } else {
@@ -1239,65 +1248,54 @@ bot.on("message:text", async (ctx) => {
       }
     } catch (error) {
       console.error("Error setting main headline:", error);
-      await ctx.reply("❌ Failed to set main headline. Please try again.");
+      await ctx.reply("Failed to set main headline. Try again.");
     }
 
-    // Reset session
     resetSession(session);
     return;
   }
 
-  // Skip if it's any other command
+  // Skip other commands
   if (text.startsWith("/")) {
     return;
   }
 
   switch (session.step) {
-    // Adding regular headline flow - receive URL
     case "awaiting_url": {
-      // Validate URL
       try {
         new URL(text);
       } catch {
-        await ctx.reply("❌ Invalid URL. Please send a valid URL:");
+        await ctx.reply("Invalid URL. Send a valid link:");
         return;
       }
 
       session.pendingUrl = text;
-
-      // Show loading message
-      const loadingMsg = await ctx.reply("🔄 Fetching article and generating headlines...");
+      const loadingMsg = await ctx.reply("Fetching article and generating headlines...");
 
       try {
-        // Fetch page content
         const pageData = await fetchPageContent(text);
-        
-        // Store image URL if found
         session.pendingImageUrl = pageData.imageUrl || undefined;
-        
-        // Generate headlines with AI
+
         const headlines = await generateHeadlines(text, pageData);
         session.generatedHeadlines = headlines;
         session.step = "awaiting_headline_choice";
 
-        // Create keyboard with headline options
         const keyboard = new InlineKeyboard();
         headlines.forEach((_, index) => {
           keyboard.text(`${index + 1}`, `headline_${index}`).row();
         });
-        keyboard.text("✏️ Write my own", "headline_custom");
+        keyboard.text("Write my own", "headline_custom");
 
-        // Build message with numbered headlines
-        let message = "🤖 *AI-Generated Headlines:*\n\n";
+        let msg = `*Generated Headlines*\n\n`;
         headlines.forEach((headline, index) => {
-          message += `*${index + 1}.* ${headline}\n\n`;
+          msg += `*${index + 1}.* ${headline}\n\n`;
         });
         if (pageData.imageUrl) {
-          message += `🖼️ _Thumbnail detected_\n\n`;
+          msg += `_Thumbnail available_\n\n`;
         }
-        message += "Choose a headline or write your own:";
+        msg += "Select one or write your own:";
 
-        await ctx.api.editMessageText(ctx.chat.id, loadingMsg.message_id, message, {
+        await ctx.api.editMessageText(ctx.chat.id, loadingMsg.message_id, msg, {
           parse_mode: "Markdown",
           reply_markup: keyboard,
         });
@@ -1306,57 +1304,48 @@ bot.on("message:text", async (ctx) => {
         await ctx.api.editMessageText(
           ctx.chat.id,
           loadingMsg.message_id,
-          "❌ Failed to generate headlines. Please try again or send a headline manually."
+          "Failed to generate headlines. Try again or type one manually."
         );
         session.step = "idle";
       }
       break;
     }
 
-    // Main headline flow - receive URL
     case "awaiting_main_url": {
       try {
         new URL(text);
       } catch {
-        await ctx.reply("❌ Invalid URL. Please send a valid URL:");
+        await ctx.reply("Invalid URL. Send a valid link:");
         return;
       }
 
       session.pendingUrl = text;
-
-      // Show loading message
-      const loadingMsg = await ctx.reply("🔄 Fetching article and generating headlines...");
+      const loadingMsg = await ctx.reply("Fetching article and generating headlines...");
 
       try {
-        // Fetch page content
         const pageData = await fetchPageContent(text);
-        
-        // Store image URL if found
         session.pendingImageUrl = pageData.imageUrl || undefined;
-        
-        // Generate headlines with AI
+
         const headlines = await generateHeadlines(text, pageData);
         session.generatedHeadlines = headlines;
         session.step = "awaiting_main_headline_choice";
 
-        // Create keyboard with headline options
         const keyboard = new InlineKeyboard();
         headlines.forEach((_, index) => {
           keyboard.text(`${index + 1}`, `main_headline_${index}`).row();
         });
-        keyboard.text("✏️ Write my own", "main_headline_custom");
+        keyboard.text("Write my own", "main_headline_custom");
 
-        // Build message with numbered headlines
-        let message = "🤖 *AI-Generated Headlines for Main Spot:*\n\n";
+        let msg = `*Main Headline Options*\n\n`;
         headlines.forEach((headline, index) => {
-          message += `*${index + 1}.* ${headline}\n\n`;
+          msg += `*${index + 1}.* ${headline}\n\n`;
         });
         if (pageData.imageUrl) {
-          message += `🖼️ _Thumbnail detected_\n\n`;
+          msg += `_Thumbnail available_\n\n`;
         }
-        message += "Choose a headline or write your own:";
+        msg += "Select one or write your own:";
 
-        await ctx.api.editMessageText(ctx.chat.id, loadingMsg.message_id, message, {
+        await ctx.api.editMessageText(ctx.chat.id, loadingMsg.message_id, msg, {
           parse_mode: "Markdown",
           reply_markup: keyboard,
         });
@@ -1365,61 +1354,59 @@ bot.on("message:text", async (ctx) => {
         await ctx.api.editMessageText(
           ctx.chat.id,
           loadingMsg.message_id,
-          "❌ Failed to generate headlines. Please try again."
+          "Failed to generate headlines. Try again."
         );
         session.step = "idle";
       }
       break;
     }
 
-    // Custom headline entry for regular headlines
     case "awaiting_headline_choice": {
       session.pendingTitle = text;
-      
+
       if (session.pendingImageUrl) {
         session.step = "awaiting_image_choice";
-        
+
         const keyboard = new InlineKeyboard()
-          .text("✅ Yes, include image", "image_yes")
-          .text("❌ No image", "image_no");
+          .text("Yes", "image_yes")
+          .text("No", "image_no");
 
         await ctx.reply(
-          `✅ Headline set!\n\n📰 "${text}"\n\n🖼️ Include the article thumbnail?`,
+          `Headline: "${text}"\n\nInclude thumbnail?`,
           { reply_markup: keyboard }
         );
       } else {
         session.step = "awaiting_column";
-        
-        const keyboard = new InlineKeyboard()
-          .text("◀️ Left Column", "column_left")
-          .text("▶️ Right Column", "column_right");
 
-        await ctx.reply(`✅ Headline set!\n\n📰 "${text}"\n\nChoose the column:`, {
+        const keyboard = new InlineKeyboard()
+          .text("Left", "column_left")
+          .text("Right", "column_right");
+
+        await ctx.reply(`Headline: "${text}"\n\nColumn:`, {
           reply_markup: keyboard,
         });
       }
       break;
     }
 
-    // Custom headline entry for main headline
     case "awaiting_main_headline_choice": {
       session.pendingTitle = text;
-      
+
       if (session.pendingImageUrl) {
         session.step = "awaiting_main_image_choice";
-        
+
         const keyboard = new InlineKeyboard()
-          .text("✅ Yes, include image", "main_image_yes")
-          .text("❌ No image", "main_image_no");
+          .text("Yes", "main_image_yes")
+          .text("No", "main_image_no");
 
         await ctx.reply(
-          `✅ Headline set!\n\n📰 "${text}"\n\n🖼️ Include the article thumbnail?`,
+          `Headline: "${text}"\n\nInclude thumbnail?`,
           { reply_markup: keyboard }
         );
       } else {
         session.step = "awaiting_main_subtitle";
         await ctx.reply(
-          `✅ Headline set!\n\n📰 "${text}"\n\nSend a subtitle (or /skip to skip):`
+          `Headline: "${text}"\n\nSend a subtitle (or /skip):`
         );
       }
       break;
@@ -1427,7 +1414,7 @@ bot.on("message:text", async (ctx) => {
 
     case "awaiting_main_subtitle": {
       const subtitle = text === "/skip" ? undefined : text;
-      
+
       try {
         const response = await apiRequest("/main-headline", "PUT", {
           title: session.pendingTitle,
@@ -1438,12 +1425,13 @@ bot.on("message:text", async (ctx) => {
 
         if (response.ok) {
           await ctx.reply(
-            `✅ *Main headline updated!*\n\n` +
-            `📰 ${escapeMarkdown(session.pendingTitle || "")}\n` +
-            `🔗 \`${session.pendingUrl || ""}\`\n` +
-            `${subtitle ? `📝 ${escapeMarkdown(subtitle)}\n` : ""}` +
-            `${session.includeImage ? "🖼️ With thumbnail\n" : ""}` +
-            `\nView it at: ${API_URL}`,
+            `*Main headline updated*\n` +
+            `─────────────────────\n\n` +
+            `${escapeMarkdown(session.pendingTitle || "")}\n` +
+            `URL: \`${session.pendingUrl || ""}\`\n` +
+            `${subtitle ? `Subtitle: ${escapeMarkdown(subtitle)}\n` : ""}` +
+            `${session.includeImage ? "Image: included\n" : ""}` +
+            `\n${API_URL}`,
             { parse_mode: "Markdown" }
           );
         } else {
@@ -1452,33 +1440,28 @@ bot.on("message:text", async (ctx) => {
         }
       } catch (error) {
         console.error("Error setting main headline:", error);
-        await ctx.reply("❌ Failed to set main headline. Please try again.");
+        await ctx.reply("Failed to set main headline. Try again.");
       }
 
       resetSession(session);
       break;
     }
 
-    // ============= COIN OF THE DAY FLOW =============
-
-    // COTD: receive URL
     case "awaiting_cotd_url": {
       try {
         new URL(text);
       } catch {
-        await ctx.reply("❌ Invalid URL. Please send a valid URL:");
+        await ctx.reply("Invalid URL. Send a valid link:");
         return;
       }
 
       session.pendingUrl = text;
-
-      const loadingMsg = await ctx.reply("🔄 Fetching project info and generating title...");
+      const loadingMsg = await ctx.reply("Fetching project info...");
 
       try {
         const pageData = await fetchPageContent(text);
-        
         session.pendingImageUrl = pageData.imageUrl || undefined;
-        
+
         const headlines = await generateCotdHeadlines(text, pageData);
         session.generatedHeadlines = headlines;
         session.step = "awaiting_cotd_headline_choice";
@@ -1487,18 +1470,18 @@ bot.on("message:text", async (ctx) => {
         headlines.forEach((_, index) => {
           keyboard.text(`${index + 1}`, `cotd_headline_${index}`).row();
         });
-        keyboard.text("✏️ Write my own", "cotd_headline_custom");
+        keyboard.text("Write my own", "cotd_headline_custom");
 
-        let message = "⭐ *Coin Of The Day - Choose a Title:*\n\n";
+        let msg = `*Coin of the Day — Title Options*\n\n`;
         headlines.forEach((headline, index) => {
-          message += `*${index + 1}.* ${headline}\n\n`;
+          msg += `*${index + 1}.* ${headline}\n\n`;
         });
         if (pageData.imageUrl) {
-          message += `🖼️ _Project image detected_\n\n`;
+          msg += `_Project image available_\n\n`;
         }
-        message += "Choose a title or write your own:";
+        msg += "Select one or write your own:";
 
-        await ctx.api.editMessageText(ctx.chat.id, loadingMsg.message_id, message, {
+        await ctx.api.editMessageText(ctx.chat.id, loadingMsg.message_id, msg, {
           parse_mode: "Markdown",
           reply_markup: keyboard,
         });
@@ -1507,41 +1490,39 @@ bot.on("message:text", async (ctx) => {
         await ctx.api.editMessageText(
           ctx.chat.id,
           loadingMsg.message_id,
-          "❌ Failed to fetch project info. Please try again."
+          "Failed to fetch project info. Try again."
         );
         session.step = "idle";
       }
       break;
     }
 
-    // COTD: custom title typed as text
     case "awaiting_cotd_headline_choice": {
       session.pendingTitle = text;
-      
+
       if (session.pendingImageUrl) {
         session.step = "awaiting_cotd_image_choice";
-        
+
         const keyboard = new InlineKeyboard()
-          .text("✅ Yes, include image", "cotd_image_yes")
-          .text("❌ No image", "cotd_image_no");
+          .text("Yes", "cotd_image_yes")
+          .text("No", "cotd_image_no");
 
         await ctx.reply(
-          `✅ Title set!\n\n⭐ "${text}"\n\n🖼️ Include the project image?`,
+          `Title: "${text}"\n\nInclude project image?`,
           { reply_markup: keyboard }
         );
       } else {
         session.step = "awaiting_cotd_description";
         await ctx.reply(
-          `✅ Title set!\n\n⭐ "${text}"\n\nSend a short description (or /skip to skip):`
+          `Title: "${text}"\n\nSend a short description (or /skip):`
         );
       }
       break;
     }
 
-    // COTD: description
     case "awaiting_cotd_description": {
       const description = text === "/skip" ? undefined : text;
-      
+
       try {
         const response = await apiRequest("/coin-of-the-day", "PUT", {
           title: session.pendingTitle,
@@ -1552,13 +1533,14 @@ bot.on("message:text", async (ctx) => {
 
         if (response.ok) {
           await ctx.reply(
-            `✅ *Coin Of The Day updated!*\n\n` +
-            `⭐ ${escapeMarkdown(session.pendingTitle || "")}\n` +
-            `🔗 \`${session.pendingUrl || ""}\`\n` +
-            `${description ? `📝 ${escapeMarkdown(description)}\n` : ""}` +
-            `${session.includeImage ? "🖼️ With image\n" : ""}` +
-            `\n_No pump.fun coin will be created._\n` +
-            `\nView it at: ${API_URL}`,
+            `*Coin of the Day updated*\n` +
+            `─────────────────────\n\n` +
+            `Title: ${escapeMarkdown(session.pendingTitle || "")}\n` +
+            `URL: \`${session.pendingUrl || ""}\`\n` +
+            `${description ? `Description: ${escapeMarkdown(description)}\n` : ""}` +
+            `${session.includeImage ? "Image: included\n" : ""}` +
+            `\n_No pump.fun token created._\n` +
+            `\n${API_URL}`,
             { parse_mode: "Markdown" }
           );
         } else {
@@ -1567,7 +1549,7 @@ bot.on("message:text", async (ctx) => {
         }
       } catch (error) {
         console.error("Error setting coin of the day:", error);
-        await ctx.reply("❌ Failed to set Coin Of The Day. Please try again.");
+        await ctx.reply("Failed to set Coin of the Day. Try again.");
       }
 
       resetSession(session);
@@ -1579,21 +1561,23 @@ bot.on("message:text", async (ctx) => {
   }
 });
 
-// Handle callback queries (button clicks)
+// ============================================================
+//  CALLBACK QUERIES (button clicks)
+// ============================================================
+
 bot.on("callback_query:data", async (ctx) => {
   const data = ctx.callbackQuery.data;
   const session = ctx.session;
 
-  // Verify the user is still authorized before processing editor callbacks
   if (!ctx.from || !isAuthorized(ctx.from.id)) {
-    await ctx.answerCallbackQuery({ text: "You are not authorized." });
+    await ctx.answerCallbackQuery({ text: "Not authorized." });
     return;
   }
 
-  // Handle headline selection for regular headlines
+  // Headline selection (regular)
   if (data.startsWith("headline_")) {
     if (data === "headline_custom") {
-      await ctx.editMessageText("✏️ Send me your custom headline:");
+      await ctx.editMessageText("Type your headline:");
       await ctx.answerCallbackQuery();
       return;
     }
@@ -1603,27 +1587,27 @@ bot.on("callback_query:data", async (ctx) => {
 
     if (selectedHeadline) {
       session.pendingTitle = selectedHeadline;
-      
+
       if (session.pendingImageUrl) {
         session.step = "awaiting_image_choice";
-        
+
         const keyboard = new InlineKeyboard()
-          .text("✅ Yes, include image", "image_yes")
-          .text("❌ No image", "image_no");
+          .text("Yes", "image_yes")
+          .text("No", "image_no");
 
         await ctx.editMessageText(
-          `✅ Headline selected!\n\n📰 "${selectedHeadline}"\n\n🖼️ Include the article thumbnail?`,
+          `Selected: "${selectedHeadline}"\n\nInclude thumbnail?`,
           { reply_markup: keyboard }
         );
       } else {
         session.step = "awaiting_column";
 
         const keyboard = new InlineKeyboard()
-          .text("◀️ Left Column", "column_left")
-          .text("▶️ Right Column", "column_right");
+          .text("Left", "column_left")
+          .text("Right", "column_right");
 
         await ctx.editMessageText(
-          `✅ Headline selected!\n\n📰 "${selectedHeadline}"\n\nChoose the column:`,
+          `Selected: "${selectedHeadline}"\n\nColumn:`,
           { reply_markup: keyboard }
         );
       }
@@ -1632,27 +1616,27 @@ bot.on("callback_query:data", async (ctx) => {
     return;
   }
 
-  // Handle image choice for regular headlines
+  // Image choice (regular)
   if (data === "image_yes" || data === "image_no") {
     session.includeImage = data === "image_yes";
     session.step = "awaiting_column";
 
     const keyboard = new InlineKeyboard()
-      .text("◀️ Left Column", "column_left")
-      .text("▶️ Right Column", "column_right");
+      .text("Left", "column_left")
+      .text("Right", "column_right");
 
     await ctx.editMessageText(
-      `✅ ${data === "image_yes" ? "Image will be included!" : "No image."}\n\n📰 "${session.pendingTitle}"\n\nChoose the column:`,
+      `${data === "image_yes" ? "Image included." : "No image."}\n\n"${session.pendingTitle}"\n\nColumn:`,
       { reply_markup: keyboard }
     );
     await ctx.answerCallbackQuery();
     return;
   }
 
-  // Handle headline selection for main headline
+  // Main headline selection
   if (data.startsWith("main_headline_")) {
     if (data === "main_headline_custom") {
-      await ctx.editMessageText("✏️ Send me your custom headline:");
+      await ctx.editMessageText("Type your headline:");
       await ctx.answerCallbackQuery();
       return;
     }
@@ -1662,22 +1646,22 @@ bot.on("callback_query:data", async (ctx) => {
 
     if (selectedHeadline) {
       session.pendingTitle = selectedHeadline;
-      
+
       if (session.pendingImageUrl) {
         session.step = "awaiting_main_image_choice";
-        
+
         const keyboard = new InlineKeyboard()
-          .text("✅ Yes, include image", "main_image_yes")
-          .text("❌ No image", "main_image_no");
+          .text("Yes", "main_image_yes")
+          .text("No", "main_image_no");
 
         await ctx.editMessageText(
-          `✅ Headline selected!\n\n📰 "${selectedHeadline}"\n\n🖼️ Include the article thumbnail?`,
+          `Selected: "${selectedHeadline}"\n\nInclude thumbnail?`,
           { reply_markup: keyboard }
         );
       } else {
         session.step = "awaiting_main_subtitle";
         await ctx.editMessageText(
-          `✅ Headline selected!\n\n📰 "${selectedHeadline}"\n\nSend a subtitle (or /skip to skip):`
+          `Selected: "${selectedHeadline}"\n\nSend a subtitle (or /skip):`
         );
       }
     }
@@ -1685,22 +1669,22 @@ bot.on("callback_query:data", async (ctx) => {
     return;
   }
 
-  // Handle image choice for main headline
+  // Main image choice
   if (data === "main_image_yes" || data === "main_image_no") {
     session.includeImage = data === "main_image_yes";
     session.step = "awaiting_main_subtitle";
 
     await ctx.editMessageText(
-      `✅ ${data === "main_image_yes" ? "Image will be included!" : "No image."}\n\n📰 "${session.pendingTitle}"\n\nSend a subtitle (or /skip to skip):`
+      `${data === "main_image_yes" ? "Image included." : "No image."}\n\n"${session.pendingTitle}"\n\nSend a subtitle (or /skip):`
     );
     await ctx.answerCallbackQuery();
     return;
   }
 
-  // Handle COTD headline selection
+  // COTD headline selection
   if (data.startsWith("cotd_headline_")) {
     if (data === "cotd_headline_custom") {
-      await ctx.editMessageText("✏️ Send me your custom title for Coin Of The Day:");
+      await ctx.editMessageText("Type your title:");
       await ctx.answerCallbackQuery();
       return;
     }
@@ -1710,22 +1694,22 @@ bot.on("callback_query:data", async (ctx) => {
 
     if (selectedHeadline) {
       session.pendingTitle = selectedHeadline;
-      
+
       if (session.pendingImageUrl) {
         session.step = "awaiting_cotd_image_choice";
-        
+
         const keyboard = new InlineKeyboard()
-          .text("✅ Yes, include image", "cotd_image_yes")
-          .text("❌ No image", "cotd_image_no");
+          .text("Yes", "cotd_image_yes")
+          .text("No", "cotd_image_no");
 
         await ctx.editMessageText(
-          `✅ Title selected!\n\n⭐ "${selectedHeadline}"\n\n🖼️ Include the project image?`,
+          `Selected: "${selectedHeadline}"\n\nInclude project image?`,
           { reply_markup: keyboard }
         );
       } else {
         session.step = "awaiting_cotd_description";
         await ctx.editMessageText(
-          `✅ Title selected!\n\n⭐ "${selectedHeadline}"\n\nSend a short description (or /skip to skip):`
+          `Selected: "${selectedHeadline}"\n\nSend a short description (or /skip):`
         );
       }
     }
@@ -1733,22 +1717,22 @@ bot.on("callback_query:data", async (ctx) => {
     return;
   }
 
-  // Handle COTD image choice
+  // COTD image choice
   if (data === "cotd_image_yes" || data === "cotd_image_no") {
     session.includeImage = data === "cotd_image_yes";
     session.step = "awaiting_cotd_description";
 
     await ctx.editMessageText(
-      `✅ ${data === "cotd_image_yes" ? "Image will be included!" : "No image."}\n\n⭐ "${session.pendingTitle}"\n\nSend a short description (or /skip to skip):`
+      `${data === "cotd_image_yes" ? "Image included." : "No image."}\n\n"${session.pendingTitle}"\n\nSend a short description (or /skip):`
     );
     await ctx.answerCallbackQuery();
     return;
   }
 
-  // Handle column selection
+  // Column selection
   if (session.step === "awaiting_column" && (data === "column_left" || data === "column_right")) {
     const column = data === "column_left" ? "left" : "right";
-    
+
     try {
       const response = await apiRequest("/headlines", "POST", {
         title: session.pendingTitle,
@@ -1759,15 +1743,16 @@ bot.on("callback_query:data", async (ctx) => {
 
       if (response.ok) {
         const result = await response.json();
-        const columnLabel = column === "left" ? "Left" : "Right";
-        
+        const colLabel = column === "left" ? "Left" : "Right";
+
         await ctx.editMessageText(
-          `✅ *Headline added to ${columnLabel} column!*\n\n` +
-          `📰 ${escapeMarkdown(session.pendingTitle || "")}\n` +
-          `🔗 \`${session.pendingUrl || ""}\`\n` +
-          `${session.includeImage ? "🖼️ With thumbnail\n" : ""}` +
-          `\nID: \`${result.headline.id}\`\n` +
-          `View it at: ${API_URL}`,
+          `*Headline added — ${colLabel} column*\n` +
+          `─────────────────────\n\n` +
+          `${escapeMarkdown(session.pendingTitle || "")}\n` +
+          `URL: \`${session.pendingUrl || ""}\`\n` +
+          `${session.includeImage ? "Image: included\n" : ""}` +
+          `ID: \`${result.headline.id}\`\n` +
+          `\n${API_URL}`,
           { parse_mode: "Markdown" }
         );
       } else {
@@ -1776,7 +1761,7 @@ bot.on("callback_query:data", async (ctx) => {
       }
     } catch (error) {
       console.error("Error adding headline:", error);
-      await ctx.editMessageText("❌ Failed to add headline. Please try again.");
+      await ctx.editMessageText("Failed to add headline. Try again.");
     }
 
     resetSession(session);
@@ -1798,26 +1783,23 @@ async function gracefulShutdown(signal: string): Promise<void> {
     console.log(`[Bot] Already shutting down, ignoring ${signal}`);
     return;
   }
-  
+
   isShuttingDown = true;
-  console.log(`\n👋 Received ${signal}, shutting down gracefully...`);
-  
+  console.log(`\nReceived ${signal}, shutting down...`);
+
   try {
-    // Stop the bot - this cancels long polling and releases the connection
     await bot.stop();
-    console.log("✅ Bot stopped successfully");
+    console.log("Bot stopped.");
   } catch (error) {
     console.error("Error stopping bot:", error);
   }
-  
+
   process.exit(0);
 }
 
-// Handle shutdown signals
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
-// Handle uncaught errors gracefully
 process.on("uncaughtException", async (error) => {
   console.error("Uncaught exception:", error);
   await gracefulShutdown("uncaughtException");
@@ -1825,22 +1807,18 @@ process.on("uncaughtException", async (error) => {
 
 process.on("unhandledRejection", async (reason) => {
   console.error("Unhandled rejection:", reason);
-  // Don't exit on unhandled rejections, just log them
 });
 
 // Start the bot
-console.log("🤖 Starting AINTIVIRUS Telegram Bot...");
+console.log("Starting bot...");
 bot.start({
   onStart: (botInfo) => {
-    console.log(`✅ Bot started as @${botInfo.username}`);
-    console.log(`📡 API URL: ${API_URL}`);
-    console.log(`👮 Admin IDs: ${ADMIN_IDS.join(", ") || "None configured"}`);
-    console.log(`🤖 OpenAI: Configured`);
-    
-    // Signal PM2 that the bot is ready (for graceful restarts)
+    console.log(`Bot started: @${botInfo.username}`);
+    console.log(`API: ${API_URL}`);
+    console.log(`Admins: ${ADMIN_IDS.join(", ") || "none"}`);
+
     if (process.send) {
       process.send("ready");
-      console.log("📤 Sent ready signal to PM2");
     }
   },
 });

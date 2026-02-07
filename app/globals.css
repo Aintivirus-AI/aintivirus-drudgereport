@@ -2450,218 +2450,216 @@ body.nav-no-scroll {
 }
 
 /* ========================================
-   WAR ROOM PAGE
+   WAR ROOM (compact embedded)
    ======================================== */
 
-.warroom-page {
-  background: #020208;
-  color: #ededed;
+.warroom-section {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.15);
 }
 
-.warroom {
+.warroom-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-family: var(--font-jetbrains-mono), monospace;
 }
 
-.warroom-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
-  font-size: 12px;
-  letter-spacing: 2px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.warroom-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.warroom-status-connected {
-  background: #00ff9d;
-  box-shadow: 0 0 8px rgba(0, 255, 157, 0.5);
-  animation: war-room-pulse 2s ease-in-out infinite;
-}
-
-.warroom-status-disconnected {
-  background: #ef4444;
-}
-
-/* Stats dashboard */
-.warroom-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-@media (max-width: 768px) {
-  .warroom-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.warroom-stat {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  padding: 16px;
-  text-align: center;
-}
-
-.warroom-stat-value {
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-  margin-bottom: 6px;
-}
-
-.warroom-stat-label {
+.warroom-section-title {
   font-size: 10px;
+  font-weight: 700;
   letter-spacing: 2px;
   color: rgba(255, 255, 255, 0.4);
 }
 
-/* Event feed */
-.warroom-feed {
+.warroom-section-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #00ff9d;
+  animation: war-room-pulse 2s ease-in-out infinite;
+}
+
+.warroom-mini {
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+/* Inline stats row */
+.warroom-mini-stats {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 600px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex-wrap: wrap;
+}
+
+.warroom-mini-stat {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.warroom-mini-stat-val {
+  font-weight: 700;
+}
+
+.warroom-mini-stat-sep {
+  width: 1px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.warroom-mini-live {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.warroom-mini-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.warroom-mini-live-dot.connected {
+  background: #00ff9d;
+  box-shadow: 0 0 4px rgba(0, 255, 157, 0.4);
+  animation: war-room-pulse 2s ease-in-out infinite;
+}
+
+/* Compact event feed */
+.warroom-mini-feed {
+  max-height: 200px;
   overflow-y: auto;
-  padding-right: 8px;
 }
 
-.warroom-feed::-webkit-scrollbar {
-  width: 4px;
+.warroom-mini-feed::-webkit-scrollbar {
+  width: 3px;
 }
 
-.warroom-feed::-webkit-scrollbar-track {
+.warroom-mini-feed::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.warroom-feed::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+.warroom-mini-feed::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
 }
 
-@keyframes warroom-event-slide {
-  from { opacity: 0; transform: translateX(-10px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-.warroom-event {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.02);
-  border-left: 3px solid #9ca3af;
-  border-radius: 0 6px 6px 0;
-  animation: warroom-event-slide 0.3s ease-out both;
-  transition: background 0.15s;
-}
-
-.warroom-event:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.warroom-event-header {
+.warroom-mini-event {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 5px 14px;
+  border-left: 2px solid #9ca3af;
+  transition: background 0.1s;
 }
 
-.warroom-event-icon {
-  font-size: 14px;
+.warroom-mini-event:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.warroom-mini-event-icon {
+  font-size: 11px;
   line-height: 1;
+  flex-shrink: 0;
 }
 
-.warroom-event-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
+.warroom-mini-event-msg {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.warroom-event-time {
-  margin-left: auto;
-  font-size: 10px;
+.warroom-mini-event-time {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.warroom-mini-empty {
+  text-align: center;
+  padding: 20px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.25);
 }
 
-.warroom-event-message {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-  line-height: 1.4;
-  padding-left: 22px;
-}
-
-.warroom-empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 14px;
-}
-
-.warroom-empty-sub {
-  margin-top: 8px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.15);
-}
-
 /* Light mode War Room */
-[data-theme="light"] .warroom-status {
-  color: rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="light"] .warroom-status-connected {
-  background: #059669;
-  box-shadow: 0 0 8px rgba(5, 150, 105, 0.4);
-}
-
-[data-theme="light"] .warroom-stat {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-[data-theme="light"] .warroom-stat-value {
-  filter: brightness(0.7);
-}
-
-[data-theme="light"] .warroom-stat-label {
-  color: rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="light"] .warroom-event {
+[data-theme="light"] .warroom-section {
   background: rgba(0, 0, 0, 0.03);
-  border-left-color: #9ca3af;
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
-[data-theme="light"] .warroom-event:hover {
-  background: rgba(0, 0, 0, 0.06);
+[data-theme="light"] .warroom-section-header {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="light"] .warroom-event-label {
+[data-theme="light"] .warroom-section-title {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] .warroom-section-dot {
+  background: #059669;
+}
+
+[data-theme="light"] .warroom-mini-stats {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .warroom-mini-stat {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .warroom-mini-stat-val {
   filter: brightness(0.75);
 }
 
-[data-theme="light"] .warroom-event-time {
+[data-theme="light"] .warroom-mini-stat-sep {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .warroom-mini-live {
   color: rgba(0, 0, 0, 0.35);
 }
 
-[data-theme="light"] .warroom-event-message {
-  color: rgba(0, 0, 0, 0.7);
+[data-theme="light"] .warroom-mini-live-dot.connected {
+  background: #059669;
+  box-shadow: 0 0 4px rgba(5, 150, 105, 0.3);
 }
 
-[data-theme="light"] .warroom-feed::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+[data-theme="light"] .warroom-mini-event {
+  border-left-color: #d1d5db;
 }
 
-[data-theme="light"] .warroom-empty {
-  color: rgba(0, 0, 0, 0.4);
+[data-theme="light"] .warroom-mini-event:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
-[data-theme="light"] .warroom-empty-sub {
-  color: rgba(0, 0, 0, 0.25);
+[data-theme="light"] .warroom-mini-event-msg {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .warroom-mini-event-time {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .warroom-mini-feed::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .warroom-mini-empty {
+  color: rgba(0, 0, 0, 0.3);
 }

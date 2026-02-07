@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { UpArrowIcon, DownArrowIcon } from "./Icons";
 
 interface VoteButtonsProps {
   headlineId: number;
@@ -82,7 +83,7 @@ export function VoteButtons({ headlineId, compact = false }: VoteButtonsProps) {
           disabled={!!state.voted}
           title="WAGMI"
         >
-          <span className="vote-icon-emoji">🚀</span>
+          <UpArrowIcon size={12} />
           {total > 0 && <span className="vote-compact-count">{state.wagmi}</span>}
         </button>
         <button
@@ -91,7 +92,7 @@ export function VoteButtons({ headlineId, compact = false }: VoteButtonsProps) {
           disabled={!!state.voted}
           title="NGMI"
         >
-          <span className="vote-icon-emoji">💀</span>
+          <DownArrowIcon size={12} />
           {total > 0 && <span className="vote-compact-count">{state.ngmi}</span>}
         </button>
       </div>
@@ -106,7 +107,7 @@ export function VoteButtons({ headlineId, compact = false }: VoteButtonsProps) {
           className={`vote-btn vote-btn-wagmi ${state.voted === "wagmi" ? "vote-active" : ""} ${state.voted ? "vote-disabled" : ""}`}
           disabled={!!state.voted}
         >
-          <span className="vote-icon-emoji-lg">🚀</span>
+          <UpArrowIcon size={20} />
           <span className="vote-label">WAGMI</span>
           <span className="vote-count">{state.wagmi}</span>
         </button>
@@ -116,7 +117,7 @@ export function VoteButtons({ headlineId, compact = false }: VoteButtonsProps) {
           className={`vote-btn vote-btn-ngmi ${state.voted === "ngmi" ? "vote-active" : ""} ${state.voted ? "vote-disabled" : ""}`}
           disabled={!!state.voted}
         >
-          <span className="vote-icon-emoji-lg">💀</span>
+          <DownArrowIcon size={20} />
           <span className="vote-label">NGMI</span>
           <span className="vote-count">{state.ngmi}</span>
         </button>

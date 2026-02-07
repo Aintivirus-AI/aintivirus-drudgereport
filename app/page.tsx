@@ -170,18 +170,14 @@ export default function Home() {
         </div>
 
         {/* War Room - Live Activity Feed */}
-        <div className="neon-divider" />
-        <div className="container mx-auto px-4 py-8 max-w-5xl">
-          <div className="text-center mb-6">
-            <h2 className="text-xl md:text-2xl font-bold tracking-wider">
-              <span className="text-neon-cyan">WAR</span>{" "}
-              <span className="text-white">ROOM</span>
-            </h2>
-            <p className="text-gray-500 text-xs mt-1 tracking-widest font-mono">
-              LIVE PLATFORM ACTIVITY
-            </p>
+        <div className="container mx-auto px-4 pt-4 pb-6 max-w-3xl">
+          <div className="warroom-section">
+            <div className="warroom-section-header">
+              <span className="warroom-section-dot" />
+              <span className="warroom-section-title">LIVE ACTIVITY</span>
+            </div>
+            <WarRoomFeed />
           </div>
-          <WarRoomFeed />
         </div>
       </div>
     </main>

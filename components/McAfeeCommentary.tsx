@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { GhostIcon } from "./Icons";
 
 interface McAfeeCommentaryProps {
   take: string;
@@ -40,7 +41,7 @@ export function McAfeeCommentary({ take, compact = false }: McAfeeCommentaryProp
   if (compact) {
     return (
       <div className="mcafee-compact">
-        <span className="mcafee-ghost-icon">👻</span>
+        <GhostIcon size={16} />
         <span className="mcafee-compact-text">{take}</span>
       </div>
     );
@@ -49,7 +50,7 @@ export function McAfeeCommentary({ take, compact = false }: McAfeeCommentaryProp
   return (
     <div className="mcafee-commentary" ref={containerRef}>
       <div className="mcafee-header">
-        <span className="mcafee-ghost-icon">👻</span>
+        <GhostIcon size={22} />
         <span className="mcafee-attribution">AI McAfee</span>
         <div className="mcafee-header-line" />
       </div>
@@ -83,7 +84,7 @@ export function McAfeeTooltip({ take, children }: McAfeeTooltipProps) {
       {children}
       {show && (
         <div className="mcafee-tooltip">
-          <span className="mcafee-ghost-icon">👻</span>
+          <GhostIcon size={18} />
           <span className="mcafee-tooltip-text">{take}</span>
         </div>
       )}

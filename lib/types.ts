@@ -15,6 +15,7 @@ export interface Headline {
 export interface TokenInfo {
   ticker: string;
   pump_url: string;
+  image_url?: string;
   price_change_24h?: number;
 }
 
