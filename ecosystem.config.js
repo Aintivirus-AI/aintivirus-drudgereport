@@ -2,14 +2,14 @@ module.exports = {
   apps: [
     {
       name: "aintivirus-web",
-      script: "npm",
-      args: "start",
+      script: "node_modules/.bin/next",
+      args: "start --port 3002",
       cwd: "/var/www/aintivirus-drudgereport",
       instances: 1,
       exec_mode: "fork",
       env: {
         NODE_ENV: "production",
-        PORT: 3001,
+        PORT: 3002,
       },
       error_file: "/var/log/aintivirus/web-error.log",
       out_file: "/var/log/aintivirus/web-out.log",
