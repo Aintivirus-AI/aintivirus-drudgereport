@@ -311,12 +311,29 @@ export function addHeadline(
 }
 
 /**
- * Remove a headline by ID
+ * Remove a headline by ID.
+ * Cleans up related votes, tokens, and revenue events to avoid FK constraint errors.
  */
 export function removeHeadline(id: number): boolean {
-  const stmt = db.prepare("DELETE FROM headlines WHERE id = ?");
-  const result = stmt.run(id);
-  return result.changes > 0;
+  const txn = db.transaction(() => {
+    // Delete votes referencing this headline
+    db.prepare("DELETE FROM votes WHERE headline_id = ?").run(id);
+
+    // Find tokens linked to this headline and clean up their revenue events
+    const tokens = db.prepare("SELECT id FROM tokens WHERE headline_id = ?").all(id) as { id: number }[];
+    for (const token of tokens) {
+      db.prepare("DELETE FROM revenue_events WHERE token_id = ?").run(token.id);
+    }
+
+    // Delete tokens linked to this headline
+    db.prepare("DELETE FROM tokens WHERE headline_id = ?").run(id);
+
+    // Delete the headline itself
+    const result = db.prepare("DELETE FROM headlines WHERE id = ?").run(id);
+    return result.changes > 0;
+  });
+
+  return txn();
 }
 
 /**
