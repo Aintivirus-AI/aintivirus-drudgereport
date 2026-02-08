@@ -24,11 +24,14 @@ A Drudge Report-style crypto news aggregator powered by AintiVirus. Users submit
 ### Other
 
 - **Dark/light theme** toggle (content area only)
+- **Text-to-speech** — Listen button reads headlines aloud via browser SpeechSynthesis API
 - **Token ticker** with live price updates via pump.fun/DexScreener APIs
 - **Top coins scrolling ribbon**
 - **Leaderboard** — Top submitters and recent token launches
 - **Auto-tweet** — Published articles post to Twitter/X
 - **Article detail pages** with token info, summary, McAfee take, voting, and social sharing
+- **AintiVirus ecosystem nav** — Navbar with dropdowns linking to Mixer, Bridge, Gift Cards, Merch, Media, and Tools
+- **Footer** with social links (YouTube, Telegram, GitHub, X/Twitter)
 
 ## Quick Start
 
@@ -64,9 +67,12 @@ Optional for token deployment:
 
 | Variable | Description |
 |----------|-------------|
-| `DEPLOYER_PRIVATE_KEY` | Solana wallet private key (base58) |
+| `MASTER_WALLET_PRIVATE_KEY` | Solana wallet private key (base58) |
 | `SOLANA_RPC_URL` | Solana RPC endpoint |
-| `HELIUS_API_KEY` | Helius API key for webhooks |
+| `NEWS_TOKEN_MINT` | $NEWS token mint address (for buy-and-burn) |
+| `MAX_NEWS_AGE_HOURS` | Max story age for acceptance (default: 6) |
+| `HELIUS_API_KEY` | Helius API key for enhanced RPC |
+| `HELIUS_WEBHOOK_SECRET` | Helius webhook auth secret |
 | `TWITTER_API_KEY` | Twitter API credentials (4 keys) |
 
 ### 3. Run
@@ -90,6 +96,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Command | Description |
 |---------|-------------|
+| `/start` | Show command overview based on your access level |
+| `/help` | Full command reference with descriptions |
 | `/submit` | Submit a news link (earn rewards if published) |
 | `/mystatus` | View your submission history and status |
 | `/cancel` | Cancel current operation |
@@ -139,6 +147,8 @@ aintivirus-drudgereport/
 ├── worker/
 │   └── scheduler.ts             # Background scheduler process
 ├── components/
+│   ├── Navbar.tsx               # Top nav with AintiVirus ecosystem dropdowns
+│   ├── Footer.tsx               # Footer with social links (YT, TG, GH, X)
 │   ├── BreakingSiren.tsx        # Breaking news siren animation
 │   ├── McAfeeCommentary.tsx     # AI McAfee hot take display
 │   ├── VoteButtons.tsx          # WAGMI/NGMI voting (full + compact)
@@ -153,7 +163,11 @@ aintivirus-drudgereport/
 │   ├── TokenBadge.tsx           # Token price badge with logo
 │   ├── TopCoinsRibbon.tsx       # Scrolling top coins
 │   ├── ThemeToggle.tsx          # Dark/light toggle
-│   └── ...                      # Share, copy, listen buttons
+│   ├── ThemeProvider.tsx        # Dark/light theme context provider
+│   ├── TimeAgo.tsx              # Relative timestamp display
+│   ├── ArticleButton.tsx        # Hover link to article detail page
+│   ├── ListenButton.tsx         # Text-to-speech via SpeechSynthesis
+│   └── ...                      # ShareButton, CopyLinkButton, CopyAddressButton
 ├── lib/
 │   ├── db.ts                    # SQLite database (schema + CRUD)
 │   ├── types.ts                 # TypeScript types
@@ -233,11 +247,12 @@ Run on any server that stays online: Railway, Render, DigitalOcean, or a VPS.
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router), React 19, TypeScript 5.7
-- **Styling**: Tailwind CSS 3.4, custom CSS
+- **Styling**: Tailwind CSS 3.4, custom CSS with neon theme
 - **Database**: SQLite (better-sqlite3) with WAL mode
 - **Bot**: Grammy (Telegram Bot Framework)
 - **AI**: OpenAI (GPT-4o-mini, text-embedding-3-small, gpt-image-1)
-- **Blockchain**: Solana Web3.js, @solana/spl-token, pump.fun API
+- **Blockchain**: Solana Web3.js, @solana/spl-token, pump.fun API, Jupiter Aggregator
+- **Runtime**: tsx (TypeScript execution for bot/scheduler), node-cron (scheduling)
 - **Fonts**: JetBrains Mono, Space Grotesk, Syne (self-hosted via next/font)
 
 ## License
