@@ -1110,14 +1110,17 @@ bot.on("message:text", async (ctx) => {
 
     session.pendingSolAddress = text;
 
-    const recentCount = getRecentSubmissionCountByUser(userId.toString(), 1);
-    if (recentCount >= 5) {
-      await ctx.reply(
-        `*Rate limit*\n\nMax 5 submissions per hour. Try again later.`,
-        { parse_mode: "Markdown" }
-      );
-      resetSession(session);
-      return;
+    // Admins bypass the hourly submission rate limit
+    if (!isAdmin(userId)) {
+      const recentCount = getRecentSubmissionCountByUser(userId.toString(), 1);
+      if (recentCount >= 5) {
+        await ctx.reply(
+          `*Rate limit*\n\nMax 5 submissions per hour. Try again later.`,
+          { parse_mode: "Markdown" }
+        );
+        resetSession(session);
+        return;
+      }
     }
 
     const existingSubmission = getRecentSubmissionByUrl(session.pendingUrl!, 48);
