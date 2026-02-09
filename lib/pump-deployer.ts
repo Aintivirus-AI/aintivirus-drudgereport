@@ -17,6 +17,8 @@ import {
   LAMPORTS_PER_SOL,
   VersionedTransaction,
 } from "@solana/web3.js";
+import fs from "fs";
+import path from "path";
 import {
   getConnection,
   getMasterWallet,
@@ -66,9 +68,22 @@ function generateMintKeypair(): Keypair {
 }
 
 /** Download image from URL and convert to Blob for upload.
- * Uses safeFetch for SSRF protection (image URLs can be user-influenced). */
+ * Local /tokens/ paths are read directly from disk (Next.js production
+ * does NOT serve files added to public/ after build time).
+ * Remote URLs use safeFetch for SSRF protection. */
 async function downloadImageAsBlob(imageUrl: string): Promise<Blob> {
-  // Import safeFetch to get SSRF protection
+  // Local image path (e.g. "/tokens/slug-abc123.png") — read from disk
+  if (imageUrl.startsWith("/tokens/")) {
+    const filePath = path.join(process.cwd(), "public", imageUrl);
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Local image not found on disk: ${filePath}`);
+    }
+    const buffer = fs.readFileSync(filePath);
+    console.log(`[PumpDeployer] Read local image from disk: ${imageUrl} (${buffer.length} bytes)`);
+    return new Blob([buffer], { type: "image/png" });
+  }
+
+  // Remote URL — fetch with SSRF protection
   const { safeFetch } = await import("./url-validator");
   const response = await safeFetch(imageUrl, {
     timeoutMs: 30_000,
@@ -350,10 +365,9 @@ export async function deployToken(
     const description =
       "News token for breaking news. Powered by The McAfee Report.";
 
-    // Resolve image URL to a full public URL for IPFS upload
-    const imageUrlForUpload = persistedImageUrl.startsWith("/")
-      ? getImagePublicUrl(persistedImageUrl)
-      : persistedImageUrl;
+    // Use the persisted path as-is — downloadImageAsBlob handles local
+    // paths by reading from disk (avoids HTTP 404 in Next.js production)
+    const imageUrlForUpload = persistedImageUrl;
 
     // Upload metadata to IPFS (with retry)
     const metadataUri = await uploadMetadataWithRetry(
