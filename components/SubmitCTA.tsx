@@ -13,10 +13,9 @@ export function SubmitCTA() {
         className="submit-cta-toggle"
         aria-expanded={expanded}
       >
-        <div className="flex items-center gap-3">
-          <span className="submit-cta-pulse" aria-hidden="true" />
+        <div className="flex items-center justify-center w-full">
           <span className="submit-cta-tagline">
-            Submit news. Launch tokens. <span className="text-neon-green">Earn crypto.</span>
+            Submit News. Launch Tokens. Earn Crypto.
           </span>
         </div>
         <svg
