@@ -1,11 +1,8 @@
 import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
 import { TokenTicker } from "@/components/TokenTicker";
-import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
-import { SentimentMeter } from "@/components/SentimentMeter";
-import { WarRoomFeed } from "@/components/WarRoomFeed";
 import { getHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
 
 // Revalidate every 10 seconds
@@ -59,9 +56,6 @@ export default function Home() {
 
         {/* Top coins scrolling ribbon */}
         {/* <TopCoinsRibbon /> */}
-
-        {/* Community Sentiment Meter */}
-        <SentimentMeter />
 
         {/* Neon divider */}
         <div className="neon-divider" />

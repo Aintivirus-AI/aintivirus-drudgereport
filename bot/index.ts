@@ -41,7 +41,10 @@ import {
   detectContentType,
   getRecentSubmissionCountByUser,
   getRecentSubmissionByUrl,
+  updateHeadlineImportanceScore,
+  updateHeadlineMcAfeeTake,
 } from "../lib/db";
+import { generateMcAfeeTake, scoreHeadlineImportance } from "../lib/mcafee-commentator";
 
 // Session data interface
 interface SessionData {
@@ -53,6 +56,7 @@ interface SessionData {
   includeImage?: boolean;
   generatedHeadlines?: string[];
   pendingSolAddress?: string;
+  pendingPageContent?: { title: string; description: string; content: string; imageUrl: string | null };
 }
 
 type MyContext = Context & SessionFlavor<SessionData>;
@@ -1217,6 +1221,28 @@ bot.on("message:text", async (ctx) => {
         image_url: session.includeImage ? session.pendingImageUrl : undefined,
       });
 
+      // 3. AI enrichment — importance score + McAfee take (non-blocking)
+      const pageContent = session.pendingPageContent || {
+        title: session.pendingTitle || "",
+        description: "",
+        content: "",
+        imageUrl: null,
+      };
+      const headlineTitle = session.pendingTitle || "";
+      const headlineId = headline.id;
+
+      // Run in background — don't block the reply
+      Promise.all([
+        scoreHeadlineImportance(headlineTitle, pageContent),
+        generateMcAfeeTake(headlineTitle, pageContent),
+      ]).then(([importanceScore, mcafeeTake]) => {
+        updateHeadlineImportanceScore(headlineId, importanceScore);
+        updateHeadlineMcAfeeTake(headlineId, mcafeeTake);
+        console.log(`[COTD] AI enrichment for #${headlineId}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`);
+      }).catch(err => {
+        console.warn(`[COTD] AI enrichment failed (non-fatal):`, err);
+      });
+
       await ctx.reply(
         `*Coin of the Day published*\n` +
         `─────────────────────\n\n` +
@@ -1224,7 +1250,8 @@ bot.on("message:text", async (ctx) => {
         `Article: \`${API_URL}${articleUrl}\`\n` +
         `Source: \`${session.pendingUrl || ""}\`\n` +
         `${session.includeImage ? "Image: included\n" : ""}` +
-        `\n_Published as article — no token created._`,
+        `\n_Published as article — no token created._\n` +
+        `_AI summary generating..._`,
         { parse_mode: "Markdown" }
       );
     } catch (error) {
@@ -1475,6 +1502,7 @@ bot.on("message:text", async (ctx) => {
       try {
         const pageData = await fetchPageContent(text);
         session.pendingImageUrl = pageData.imageUrl || undefined;
+        session.pendingPageContent = pageData;
 
         const headlines = await generateCotdHeadlines(text, pageData);
         session.generatedHeadlines = headlines;
@@ -1561,6 +1589,27 @@ bot.on("message:text", async (ctx) => {
           image_url: session.includeImage ? session.pendingImageUrl : undefined,
         });
 
+        // 3. AI enrichment — importance score + McAfee take (non-blocking)
+        const pageContent = session.pendingPageContent || {
+          title: session.pendingTitle || "",
+          description: description || "",
+          content: "",
+          imageUrl: null,
+        };
+        const headlineTitle = session.pendingTitle || "";
+        const headlineId = headline.id;
+
+        Promise.all([
+          scoreHeadlineImportance(headlineTitle, pageContent),
+          generateMcAfeeTake(headlineTitle, pageContent),
+        ]).then(([importanceScore, mcafeeTake]) => {
+          updateHeadlineImportanceScore(headlineId, importanceScore);
+          updateHeadlineMcAfeeTake(headlineId, mcafeeTake);
+          console.log(`[COTD] AI enrichment for #${headlineId}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`);
+        }).catch(err => {
+          console.warn(`[COTD] AI enrichment failed (non-fatal):`, err);
+        });
+
         await ctx.reply(
           `*Coin of the Day published*\n` +
           `─────────────────────\n\n` +
@@ -1569,7 +1618,8 @@ bot.on("message:text", async (ctx) => {
           `Source: \`${session.pendingUrl || ""}\`\n` +
           `${description ? `Description: ${escapeMarkdown(description)}\n` : ""}` +
           `${session.includeImage ? "Image: included\n" : ""}` +
-          `\n_Published as article — no token created._`,
+          `\n_Published as article — no token created._\n` +
+          `_AI summary generating..._`,
           { parse_mode: "Markdown" }
         );
       } catch (error) {
