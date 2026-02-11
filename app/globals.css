@@ -1126,10 +1126,10 @@ body.nav-no-scroll {
 /* ============= TOKEN TICKER BAR ============= */
 .token-ticker {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   margin-top: 0.75rem;
-  max-width: 100%;
-  overflow: hidden;
+  gap: 0.4rem;
 }
 
 .token-ticker-inner {
@@ -1142,8 +1142,6 @@ body.nav-no-scroll {
   background: linear-gradient(135deg, rgba(0, 255, 255, 0.12), rgba(168, 85, 247, 0.1));
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.75rem;
-  max-width: 100%;
-  flex-wrap: nowrap;
   box-shadow: 0 0 16px rgba(0, 255, 255, 0.2), 0 0 32px rgba(0, 255, 255, 0.08), inset 0 0 10px rgba(0, 255, 255, 0.06);
   animation: ticker-glow 2.5s ease-in-out infinite;
 }
@@ -1218,25 +1216,35 @@ body.nav-no-scroll {
   transform: scale(1.1);
 }
 
-.token-ticker-sep {
-  width: 1px;
-  height: 16px;
-  background: rgba(0, 255, 255, 0.3);
-  flex-shrink: 0;
-  margin: 0 0.15rem;
+.token-ticker-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.token-ticker-links-dot {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 0.85rem;
+  line-height: 1;
 }
 
 .token-ticker-link {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   color: rgba(255, 255, 255, 0.4);
   text-decoration: none;
   transition: color 0.2s ease;
   white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
 }
 
 .token-ticker-link:hover {
@@ -1288,12 +1296,12 @@ body.nav-no-scroll {
 }
 
 /* Light mode ticker links */
-:root[data-theme="light"] .token-ticker-sep {
-  background: rgba(0, 150, 150, 0.3);
+:root[data-theme="light"] .token-ticker-links-dot {
+  color: rgba(0, 0, 0, 0.15);
 }
 
 :root[data-theme="light"] .token-ticker-link {
-  color: rgba(0, 0, 0, 0.35);
+  color: rgba(0, 0, 0, 0.4);
 }
 
 :root[data-theme="light"] .token-ticker-link:hover {
@@ -1689,10 +1697,10 @@ body.nav-no-scroll {
 .ribbon-coin {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.35rem;
+  gap: 0.55rem;
+  padding: 0 0.4rem;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
 }
 
 .ribbon-rank {
@@ -1740,28 +1748,30 @@ body.nav-no-scroll {
   color: #ffffff;
   font-weight: 700;
   letter-spacing: 0.03em;
-  text-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
 }
 
 .ribbon-change {
   font-weight: 600;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   white-space: nowrap;
+  padding-left: 0.1rem;
 }
 
 .ribbon-change-up {
   color: #7fff7f;
-  text-shadow: 0 0 6px rgba(0, 255, 0, 0.3);
+  text-shadow: none;
 }
 
 .ribbon-change-down {
   color: #ff9999;
-  text-shadow: 0 0 6px rgba(255, 100, 100, 0.3);
+  text-shadow: none;
 }
 
 .ribbon-mcap {
   color: rgba(255, 255, 255, 0.55);
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 400;
   white-space: nowrap;
 }
@@ -2991,13 +3001,8 @@ body.nav-no-scroll {
   color: rgba(0, 0, 0, 0.7);
 }
 
-/* Responsive: hide ticker quick-links only on very narrow screens */
+/* Responsive: shrink ticker on very narrow screens */
 @media (max-width: 374px) {
-  .token-ticker-sep,
-  .token-ticker-link {
-    display: none;
-  }
-
   .token-ticker-inner {
     font-size: 0.65rem;
     gap: 0.3rem;
