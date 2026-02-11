@@ -327,7 +327,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
             {/* X (Twitter) */}
             <a
-              href="https://x.com/officialmcafee"
+              href="https://x.com/TheMcAfeeReport"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-neon-cyan transition-colors"
