@@ -89,13 +89,15 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                     size="sm"
                   />
                 ) : null}
-                <VoteButtons headlineId={headline.id} compact />
-                <ArticleButton url={articlePath} />
-                <ShareButton
-                  title={headline.title}
-                  url={articleUrl}
-                  ticker={headline.token?.ticker}
-                />
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <VoteButtons headlineId={headline.id} compact />
+                  <ArticleButton url={articlePath} />
+                  <ShareButton
+                    title={headline.title}
+                    url={articleUrl}
+                    ticker={headline.token?.ticker}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -155,13 +157,15 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
               size="sm"
             />
           ) : null}
-          <VoteButtons headlineId={headline.id} compact />
-          <ArticleButton url={articlePath} />
-          <ShareButton
-            title={headline.title}
-            url={articleUrl}
-            ticker={headline.token?.ticker}
-          />
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <VoteButtons headlineId={headline.id} compact />
+            <ArticleButton url={articlePath} />
+            <ShareButton
+              title={headline.title}
+              url={articleUrl}
+              ticker={headline.token?.ticker}
+            />
+          </div>
         </div>
       </div>
     </li>
