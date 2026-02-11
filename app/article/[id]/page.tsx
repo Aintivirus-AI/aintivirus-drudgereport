@@ -9,6 +9,7 @@ import { TimeAgo } from "@/components/TimeAgo";
 import { McAfeeCommentary } from "@/components/McAfeeCommentary";
 import { VoteButtons } from "@/components/VoteButtons";
 import { SubmitCTA } from "@/components/SubmitCTA";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const revalidate = 30;
 
@@ -61,7 +62,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const publishedDate = new Date(article.created_at);
 
   return (
-    <main className="min-h-screen grid-bg">
+    <main className="main-content">
+      <div className="min-h-screen grid-bg">
       {/* Header bar */}
       <div className="border-b border-dark-200/30 py-4">
         <div className="container mx-auto px-4">
@@ -69,7 +71,10 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <a href="/" className="text-neon-cyan hover:underline text-sm font-mono">
               &larr; Back to The McAfee Report
             </a>
-            <TimeAgo date={article.created_at} />
+            <div className="flex items-center gap-3">
+              <TimeAgo date={article.created_at} />
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
@@ -265,6 +270,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         <div className="border-t border-dark-200/30 pt-8">
           <SubmitCTA />
         </div>
+      </div>
       </div>
     </main>
   );

@@ -5,6 +5,7 @@ import { SubmitCTA } from "@/components/SubmitCTA";
 import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { SentimentMeter } from "@/components/SentimentMeter";
 import { WarRoomFeed } from "@/components/WarRoomFeed";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const revalidate = 30;
 
@@ -19,7 +20,8 @@ export default function AnalyticsPage() {
   const publishedToday = getPublishedTodayCount();
 
   return (
-    <main className="min-h-screen grid-bg">
+    <main className="main-content">
+      <div className="min-h-screen grid-bg">
       {/* Header */}
       <div className="border-b border-dark-200/30 py-4">
         <div className="container mx-auto px-4">
@@ -27,9 +29,12 @@ export default function AnalyticsPage() {
             <a href="/" className="text-neon-cyan hover:underline text-sm font-mono">
               &larr; Back to The McAfee Report
             </a>
-            <span className="text-gray-500 text-xs font-mono">
-              {publishedToday} articles published today
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-gray-500 text-xs font-mono">
+                {publishedToday} articles published today
+              </span>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
@@ -181,6 +186,7 @@ export default function AnalyticsPage() {
           <h3 className="text-lg font-bold text-white mb-4 text-center">Want to be on this leaderboard?</h3>
           <SubmitCTA />
         </div>
+      </div>
       </div>
     </main>
   );
