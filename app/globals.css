@@ -1468,12 +1468,9 @@ body.nav-no-scroll {
 /* Uniform badge sizing in headline rows */
 .headline-badge-uniform {
   min-width: 140px;
-  justify-content: center;
-  text-align: center;
 }
 .headline-badge-uniform > .token-badge {
   min-width: 140px;
-  justify-content: center;
 }
 
 /* ============= TOKEN BADGE ============= */
