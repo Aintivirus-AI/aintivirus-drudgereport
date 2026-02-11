@@ -44,27 +44,38 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
               )}
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-0">
-              <div className="flex items-start gap-1">
-                {headline.mcafee_take ? (
-                  <McAfeeTooltip take={headline.mcafee_take}>
-                    <a
-                      href={headline.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="neon-link text-sm hover:underline leading-tight flex-1"
-                    >
-                      {headline.title}
-                    </a>
-                  </McAfeeTooltip>
-                ) : (
+              {/* Row 1: Headline text */}
+              {headline.mcafee_take ? (
+                <McAfeeTooltip take={headline.mcafee_take}>
                   <a
                     href={headline.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="neon-link text-sm hover:underline leading-tight flex-1"
+                    className="neon-link text-sm hover:underline leading-tight"
                   >
                     {headline.title}
                   </a>
+                </McAfeeTooltip>
+              ) : (
+                <a
+                  href={headline.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="neon-link text-sm hover:underline leading-tight"
+                >
+                  {headline.title}
+                </a>
+              )}
+              {/* Row 2: Token badge + action buttons */}
+              <div className="flex items-center gap-2">
+                {headline.token && (
+                  <TokenBadge 
+                    pumpUrl={headline.token.pump_url} 
+                    ticker={headline.token.ticker}
+                    imageUrl={headline.token.image_url}
+                    priceChange={headline.token.price_change_24h}
+                    size="sm"
+                  />
                 )}
                 <VoteButtons headlineId={headline.id} compact />
                 <ArticleButton url={articlePath} />
@@ -74,16 +85,6 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                   ticker={headline.token?.ticker}
                 />
               </div>
-              {/* Token badge below title for cards */}
-              {headline.token && (
-                <TokenBadge 
-                  pumpUrl={headline.token.pump_url} 
-                  ticker={headline.token.ticker}
-                  imageUrl={headline.token.image_url}
-                  priceChange={headline.token.price_change_24h}
-                  size="sm"
-                />
-              )}
             </div>
           </div>
         </div>
@@ -93,46 +94,51 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
 
   // Default text-only layout
   return (
-    <li className="headline-bullet py-1 flex items-center gap-2 group">
-      {headline.mcafee_take ? (
-        <McAfeeTooltip take={headline.mcafee_take}>
+    <li className="headline-bullet py-1 group">
+      <div className="flex flex-col gap-1">
+        {/* Row 1: Headline text */}
+        {headline.mcafee_take ? (
+          <McAfeeTooltip take={headline.mcafee_take}>
+            <a
+              href={headline.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="neon-link text-sm hover:underline"
+            >
+              {headline.title}
+            </a>
+          </McAfeeTooltip>
+        ) : (
           <a
             href={headline.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="neon-link text-sm hover:underline flex-1"
+            className="neon-link text-sm hover:underline"
           >
             {headline.title}
           </a>
-        </McAfeeTooltip>
-      ) : (
-        <a
-          href={headline.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="neon-link text-sm hover:underline flex-1"
-        >
-          {headline.title}
-        </a>
-      )}
-      <VoteButtons headlineId={headline.id} compact />
-      <ArticleButton url={articlePath} />
-      <ShareButton
-        title={headline.title}
-        url={articleUrl}
-        ticker={headline.token?.ticker}
-      />
-      {/* Inline token badge for text-only headlines */}
-      {headline.token && (
-        <TokenBadge 
-          pumpUrl={headline.token.pump_url} 
-          ticker={headline.token.ticker}
-          imageUrl={headline.token.image_url}
-          priceChange={headline.token.price_change_24h}
-          showTicker={false}
-          size="sm"
-        />
-      )}
+        )}
+        {/* Row 2: Token badge + action buttons */}
+        <div className="flex items-center gap-2">
+          {headline.token && (
+            <TokenBadge 
+              pumpUrl={headline.token.pump_url} 
+              ticker={headline.token.ticker}
+              imageUrl={headline.token.image_url}
+              priceChange={headline.token.price_change_24h}
+              showTicker={false}
+              size="sm"
+            />
+          )}
+          <VoteButtons headlineId={headline.id} compact />
+          <ArticleButton url={articlePath} />
+          <ShareButton
+            title={headline.title}
+            url={articleUrl}
+            ticker={headline.token?.ticker}
+          />
+        </div>
+      </div>
     </li>
   );
 }
