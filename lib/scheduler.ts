@@ -335,7 +335,7 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
         submission.sol_address,
         headlineRecord.id,
         submission.id,
-        submission.url
+        `${SITE_URL}/article/${headlineRecord.id}`
       );
 
       if (deployResult.success) {
