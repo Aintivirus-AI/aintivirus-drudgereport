@@ -3401,7 +3401,7 @@ body.nav-no-scroll {
 }
 
 .submit-cta-steps {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   gap: 14px;
   margin-bottom: 20px;
