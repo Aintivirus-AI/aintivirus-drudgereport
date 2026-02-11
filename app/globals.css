@@ -3401,10 +3401,11 @@ body.nav-no-scroll {
 }
 
 .submit-cta-steps {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   gap: 14px;
   margin-bottom: 20px;
+  text-align: left;
 }
 
 .submit-cta-step {

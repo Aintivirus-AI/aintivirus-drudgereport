@@ -33,15 +33,15 @@ export function SubmitCTA() {
       <div
         className={`submit-cta-body ${expanded ? "submit-cta-body--open" : ""}`}
       >
-        <div className="submit-cta-inner">
+        <div className="submit-cta-inner text-center">
           {/* How it works */}
           <h3 className="text-sm font-semibold text-white/90 uppercase tracking-widest mb-5">
             How it works
           </h3>
 
-          <div className="submit-cta-steps">
+          <div className="submit-cta-steps items-center">
             {/* Step 1 */}
-            <div className="submit-cta-step">
+            <div className="submit-cta-step justify-center">
               <div className="submit-cta-step-num">1</div>
               <div>
                 <p className="text-sm font-medium text-white">Find breaking news</p>
@@ -52,7 +52,7 @@ export function SubmitCTA() {
             </div>
 
             {/* Step 2 */}
-            <div className="submit-cta-step">
+            <div className="submit-cta-step justify-center">
               <div className="submit-cta-step-num">2</div>
               <div>
                 <p className="text-sm font-medium text-white">Submit via Telegram</p>
@@ -63,7 +63,7 @@ export function SubmitCTA() {
             </div>
 
             {/* Step 3 */}
-            <div className="submit-cta-step">
+            <div className="submit-cta-step justify-center">
               <div className="submit-cta-step-num">3</div>
               <div>
                 <p className="text-sm font-medium text-white">AI validates & publishes</p>
@@ -74,7 +74,7 @@ export function SubmitCTA() {
             </div>
 
             {/* Step 4 */}
-            <div className="submit-cta-step">
+            <div className="submit-cta-step justify-center">
               <div className="submit-cta-step-num highlight">$</div>
               <div>
                 <p className="text-sm font-medium text-neon-green">A token launches & you earn</p>
@@ -86,12 +86,12 @@ export function SubmitCTA() {
           </div>
 
           {/* Revenue highlight */}
-          <div className="submit-cta-revenue">
+          <div className="submit-cta-revenue inline-block">
             <div className="flex items-center gap-2.5">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-neon-green flex-shrink-0">
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <div>
+              <div className="text-left">
                 <p className="text-sm font-medium text-white">No investment needed. No coding.</p>
                 <p className="text-xs text-gray-400">Just find real, breaking news before others do. Top submitters are earning every day.</p>
               </div>
@@ -99,7 +99,7 @@ export function SubmitCTA() {
           </div>
 
           {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-6">
+          <div className="flex flex-col sm:flex-row gap-3 mt-6 justify-center">
             <a
               href="https://t.me/mcafeereport_bot"
               target="_blank"
