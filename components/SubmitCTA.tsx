@@ -123,7 +123,7 @@ export function SubmitCTA() {
           </div>
 
           {/* Quick start hint */}
-          <p className="text-[11px] text-gray-500 mt-4 text-center sm:text-left">
+          <p className="text-[11px] text-gray-500 mt-4 text-center">
             After opening the bot, type <code className="text-neon-cyan/60 font-mono">/submit</code> and follow the prompts. That&apos;s it.
           </p>
         </div>
