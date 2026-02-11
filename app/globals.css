@@ -1465,14 +1465,14 @@ body.nav-no-scroll {
   stroke: #8b6c2a;
 }
 
-/* Fixed-width wrapper so all headline badges are the same size */
-.headline-badge-fixed {
-  display: inline-flex;
-  width: 100%;
+/* Uniform badge sizing in headline rows */
+.headline-badge-uniform {
+  min-width: 140px;
+  justify-content: center;
+  text-align: center;
 }
-.headline-badge-fixed > a,
-.headline-badge-fixed > .token-badge {
-  width: 100%;
+.headline-badge-uniform > .token-badge {
+  min-width: 140px;
   justify-content: center;
 }
 
