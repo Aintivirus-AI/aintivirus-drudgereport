@@ -169,6 +169,8 @@ Style rules:
 - Be subtly persuasive — make the reader curious and interested, but don't oversell or use hype language like "to the moon" or "guaranteed"
 - Write in third person, professional but approachable tone
 - No hashtags, no emojis
+- PLAIN TEXT ONLY — no markdown, no bold (**), no italic (*), no headers (#), no bullet points. Just plain paragraphs.
+- Do NOT repeat the headline or title at the start — jump straight into the content
 - If information is limited, focus on what IS known and frame unknowns as opportunity
 - End with a forward-looking statement about the project's potential`,
         },
@@ -181,10 +183,17 @@ Style rules:
       temperature: 0.9,
     });
 
-    const summary = response.choices[0]?.message?.content?.trim();
+    let summary = response.choices[0]?.message?.content?.trim();
     if (!summary) {
       throw new Error("Empty response from OpenAI");
     }
+
+    // Strip any markdown formatting that slipped through
+    summary = summary
+      .replace(/\*+/g, "")       // bold/italic markers
+      .replace(/^#+\s*/gm, "")   // heading markers
+      .replace(/^[-•]\s*/gm, "") // bullet points
+      .trim();
 
     console.log(`[McAfee] Generated COTD summary (${summary.length} chars)`);
     return summary;
