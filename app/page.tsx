@@ -9,8 +9,8 @@ import { getHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
 export const revalidate = 10;
 
 export default function Home() {
-  const leftHeadlines = getHeadlines("left", 15);
-  const rightHeadlines = getHeadlines("right", 15);
+  const leftHeadlines = getHeadlines("left", 36);
+  const rightHeadlines = getHeadlines("right", 36);
   const mainHeadline = getMainHeadline();
   const breakingHeadline = getBreakingHeadline(2, 80);
   

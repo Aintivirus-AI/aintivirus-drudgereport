@@ -224,11 +224,14 @@ export function getHeadlines(
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       h.importance_score, h.mcafee_take,
-      t.ticker, t.pump_url, t.image_url as token_image_url
+      t.ticker, t.pump_url, t.image_url as token_image_url,
+      COALESCE(SUM(CASE WHEN v.vote_type = 'wagmi' THEN 1 ELSE 0 END), 0) as wagmi_count
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
+    LEFT JOIN votes v ON v.headline_id = h.id
     WHERE h.column = ?
-    ORDER BY h.created_at DESC
+    GROUP BY h.id
+    ORDER BY wagmi_count DESC, h.created_at DESC
     LIMIT ?
   `);
   const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
