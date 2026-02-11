@@ -14,10 +14,6 @@ export default function Home() {
   const mainHeadline = getMainHeadline();
   const breakingHeadline = getBreakingHeadline(2, 80);
   
-  // Derive HOT TOPICS from already-fetched headlines (no duplicate queries)
-  const hotTopics = [...leftHeadlines.slice(0, 6), ...rightHeadlines.slice(0, 6)]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 10);
 
   return (
     <main className="main-content">
@@ -65,41 +61,6 @@ export default function Home() {
           {/* Mobile: Main headline first */}
           <div className="lg:hidden mb-8">
             <MainHeadline headline={mainHeadline} />
-            
-            {/* Hot Topics on mobile */}
-            <div className="mt-8 space-y-4">
-              <h2 className="text-neon-cyan text-lg font-semibold border-b border-dark-200/30 pb-2">
-                HOT TOPICS
-              </h2>
-              {hotTopics.length > 0 ? (
-                <ul className="space-y-2">
-                  {hotTopics.map((headline) => (
-                    <li key={headline.id} className="headline-bullet py-1">
-                      <a
-                        href={headline.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hot-topic-link text-base hover:underline font-bold"
-                      >
-                        {headline.title}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-gray-500 text-sm">
-                  <p className="text-center py-8 opacity-50">
-                    More content coming soon...
-                  </p>
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* Mobile: Divider between hot topics and columns */}
-          <div className="lg:hidden my-8">
-            <hr className="border-t-2 border-neon-cyan/50" />
           </div>
 
           {/* Mobile: Columns */}
@@ -118,36 +79,6 @@ export default function Home() {
             {/* Center - Main Headline */}
             <div className="lg:col-span-2">
               <MainHeadline headline={mainHeadline} />
-              
-              {/* Hot Topics */}
-              <div className="mt-8 space-y-4">
-                <h2 className="text-neon-cyan text-lg font-semibold border-b border-dark-200/30 pb-2">
-                  HOT TOPICS
-                </h2>
-                {hotTopics.length > 0 ? (
-                  <ul className="space-y-2">
-                    {hotTopics.map((headline) => (
-                      <li key={headline.id} className="headline-bullet py-1">
-                        <a
-                          href={headline.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hot-topic-link text-base hover:underline font-bold"
-                        >
-                          {headline.title}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-gray-500 text-sm">
-                    <p className="text-center py-8 opacity-50">
-                      More content coming soon...
-                    </p>
-                  </div>
-                )}
-              </div>
-
             </div>
 
             {/* Right Column */}
