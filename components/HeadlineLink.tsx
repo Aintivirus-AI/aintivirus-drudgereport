@@ -17,6 +17,8 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
 
   // If there's an image, show a card-style layout
   if (headline.image_url) {
+    const isCotdCard = headline.title.startsWith("Coin Of The Day:");
+
     return (
       <li className="py-2">
         <div className="block group">
@@ -66,24 +68,38 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                   {headline.title}
                 </a>
               )}
-              {/* Row 2: Token badge + action buttons */}
-              <div className="flex items-center gap-2">
-                {headline.token && (
-                  <TokenBadge 
-                    pumpUrl={headline.token.pump_url} 
-                    ticker={headline.token.ticker}
-                    imageUrl={headline.token.image_url}
-                    priceChange={headline.token.price_change_24h}
-                    size="sm"
+              {/* Row 2: Badge (left half) + action buttons (right half) */}
+              <div className="flex items-center">
+                <div className="w-1/2 flex items-center">
+                  {isCotdCard ? (
+                    <a
+                      href={articlePath}
+                      className="cotd-badge inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Coin of the Day
+                    </a>
+                  ) : headline.token ? (
+                    <TokenBadge 
+                      pumpUrl={headline.token.pump_url} 
+                      ticker={headline.token.ticker}
+                      imageUrl={headline.token.image_url}
+                      priceChange={headline.token.price_change_24h}
+                      size="sm"
+                    />
+                  ) : null}
+                </div>
+                <div className="w-1/2 flex items-center justify-end gap-2">
+                  <VoteButtons headlineId={headline.id} compact />
+                  <ArticleButton url={articlePath} />
+                  <ShareButton
+                    title={headline.title}
+                    url={articleUrl}
+                    ticker={headline.token?.ticker}
                   />
-                )}
-                <VoteButtons headlineId={headline.id} compact />
-                <ArticleButton url={articlePath} />
-                <ShareButton
-                  title={headline.title}
-                  url={articleUrl}
-                  ticker={headline.token?.ticker}
-                />
+                </div>
               </div>
             </div>
           </div>
@@ -91,6 +107,9 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
       </li>
     );
   }
+
+  // Detect Coin of the Day articles
+  const isCotd = headline.title.startsWith("Coin Of The Day:");
 
   // Default text-only layout
   return (
@@ -118,25 +137,39 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
             {headline.title}
           </a>
         )}
-        {/* Row 2: Token badge + action buttons */}
-        <div className="flex items-center gap-2">
-          {headline.token && (
-            <TokenBadge 
-              pumpUrl={headline.token.pump_url} 
-              ticker={headline.token.ticker}
-              imageUrl={headline.token.image_url}
-              priceChange={headline.token.price_change_24h}
-              showTicker={false}
-              size="sm"
+        {/* Row 2: Badge (left half) + action buttons (right half) */}
+        <div className="flex items-center">
+          <div className="w-1/2 flex items-center">
+            {isCotd ? (
+              <a
+                href={articlePath}
+                className="cotd-badge inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Coin of the Day
+              </a>
+            ) : headline.token ? (
+              <TokenBadge 
+                pumpUrl={headline.token.pump_url} 
+                ticker={headline.token.ticker}
+                imageUrl={headline.token.image_url}
+                priceChange={headline.token.price_change_24h}
+                showTicker={false}
+                size="sm"
+              />
+            ) : null}
+          </div>
+          <div className="w-1/2 flex items-center justify-end gap-2">
+            <VoteButtons headlineId={headline.id} compact />
+            <ArticleButton url={articlePath} />
+            <ShareButton
+              title={headline.title}
+              url={articleUrl}
+              ticker={headline.token?.ticker}
             />
-          )}
-          <VoteButtons headlineId={headline.id} compact />
-          <ArticleButton url={articlePath} />
-          <ShareButton
-            title={headline.title}
-            url={articleUrl}
-            ticker={headline.token?.ticker}
-          />
+          </div>
         </div>
       </div>
     </li>
