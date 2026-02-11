@@ -383,8 +383,10 @@ export async function deployToken(
     // Use AI-generated description from metadata
     const description = metadata.description;
 
-    // Use banner for pump.fun upload, logo stays on the site
-    const imageUrlForUpload = persistedBannerUrl;
+    // Upload the square logo (1024x1024) to pump.fun — their coin avatar
+    // and profile display require a square image. The banner is generated
+    // for future use but pump.fun has no separate banner upload field.
+    const imageUrlForUpload = persistedImageUrl;
 
     // Upload metadata to IPFS (with retry)
     const metadataUri = await uploadMetadataWithRetry(
