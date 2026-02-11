@@ -157,6 +157,19 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           );
         })()}
 
+        {/* Go to Project button */}
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-6 py-3 mb-8 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 hover:bg-neon-cyan/20 hover:border-neon-cyan/50 transition-all text-neon-cyan font-semibold text-sm"
+        >
+          Go to Project
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+            <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+
         {/* Token Section */}
         {article.token && (
           <div className="border border-neon-cyan/30 rounded-lg p-6 mb-8 bg-dark-100/50">
