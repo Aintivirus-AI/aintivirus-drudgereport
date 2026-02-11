@@ -8,61 +8,91 @@ interface ListenButtonProps {
 
 export function ListenButton({ text }: ListenButtonProps) {
   const [playing, setPlaying] = useState(false);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [loading, setLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      window.speechSynthesis?.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
     };
   }, []);
 
-  const handleToggle = useCallback(() => {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-
-    if (playing) {
-      synth.cancel();
+  const handleToggle = useCallback(async () => {
+    // Stop playback
+    if (playing && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       setPlaying(false);
       return;
     }
 
-    // Cancel any previous utterance
-    synth.cancel();
+    setLoading(true);
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.pitch = 1;
+      if (!res.ok) {
+        throw new Error(`TTS request failed: ${res.status}`);
+      }
 
-    // Try to pick a good English voice
-    const voices = synth.getVoices();
-    const preferred = voices.find(
-      (v) => v.lang.startsWith("en") && v.name.toLowerCase().includes("natural")
-    ) || voices.find(
-      (v) => v.lang.startsWith("en") && !v.localService
-    ) || voices.find(
-      (v) => v.lang.startsWith("en")
-    );
-    if (preferred) utterance.voice = preferred;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
 
-    utterance.onend = () => setPlaying(false);
-    utterance.onerror = () => setPlaying(false);
+      // Revoke previous object URL if any
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+      objectUrlRef.current = url;
 
-    utteranceRef.current = utterance;
-    synth.speak(utterance);
-    setPlaying(true);
+      const audio = new Audio(url);
+
+      audio.onended = () => {
+        setPlaying(false);
+      };
+
+      audio.onerror = () => {
+        console.error("[ListenButton] Audio playback error");
+        setPlaying(false);
+      };
+
+      audioRef.current = audio;
+      await audio.play();
+      setPlaying(true);
+    } catch (err) {
+      console.error("[ListenButton] TTS error:", err);
+      setPlaying(false);
+    } finally {
+      setLoading(false);
+    }
   }, [text, playing]);
-
-  // Don't render if SpeechSynthesis is not available (SSR-safe)
-  if (typeof window !== "undefined" && !window.speechSynthesis) return null;
 
   return (
     <button
       onClick={handleToggle}
       className="listen-btn"
-      title={playing ? "Stop reading" : "Listen to summary"}
+      disabled={loading}
+      title={loading ? "Generating audio..." : playing ? "Stop reading" : "Listen to McAfee read the summary"}
     >
-      {playing ? (
+      {loading ? (
+        <>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 animate-spin">
+            <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" strokeLinecap="round" />
+          </svg>
+          <span>Loading...</span>
+        </>
+      ) : playing ? (
         <>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
             <rect x="6" y="4" width="4" height="16" rx="1" />
