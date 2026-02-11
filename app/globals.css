@@ -55,6 +55,36 @@
   font-weight: 450;
 }
 
+/* Override white text to dark in light mode */
+[data-theme="light"] .main-content .text-white {
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .main-content .text-white\/80 {
+  color: rgba(26, 26, 46, 0.8);
+}
+
+[data-theme="light"] .main-content .text-white\/90 {
+  color: rgba(26, 26, 46, 0.9);
+}
+
+[data-theme="light"] .main-content .hover\:text-white:hover {
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .main-content .group-hover\:text-white:is(:where(.group):hover *) {
+  color: #1a1a2e;
+}
+
+/* Override gray-400 text to be darker in light mode */
+[data-theme="light"] .main-content .text-gray-400 {
+  color: rgba(60, 70, 80, 0.7);
+}
+
+[data-theme="light"] .main-content .text-gray-500 {
+  color: rgba(60, 70, 80, 0.6);
+}
+
 [data-theme="light"] .neon-link {
   font-weight: 500;
 }
