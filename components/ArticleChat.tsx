@@ -35,13 +35,16 @@ export function ArticleChat({ articleTitle, articleSummary }: ArticleChatProps) 
   });
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const articleContext = `Title: ${articleTitle}\n\nSummary: ${articleSummary}`;
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, []);
 
   useEffect(() => {
@@ -164,7 +167,7 @@ export function ArticleChat({ articleTitle, articleSummary }: ArticleChatProps) 
         </div>
 
         {/* Messages */}
-        <div className="article-chat-messages">
+        <div className="article-chat-messages" ref={messagesContainerRef}>
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -184,7 +187,6 @@ export function ArticleChat({ articleTitle, articleSummary }: ArticleChatProps) 
               <span className="article-chat-dot" />
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}

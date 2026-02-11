@@ -151,7 +151,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                     <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round"/>
                     <line x1="10" y1="9" x2="8" y2="9" strokeLinecap="round"/>
                   </svg>
-                  <span className="text-sm font-semibold text-white tracking-wide">SUMMARY</span>
+                  <span className="text-sm font-semibold text-white tracking-wide">SUMMARY OF ARTICLE</span>
                   <ListenButton text={articleSummary} />
                 </div>
                 <div className="article-summary-text">
