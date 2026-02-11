@@ -188,6 +188,12 @@ try {
 } catch {
   // Column already exists
 }
+// Migration: Add summary to headlines (for COTD full project summaries)
+try {
+  db.exec(`ALTER TABLE headlines ADD COLUMN summary TEXT`);
+} catch {
+  // Column already exists
+}
 
 // Insert default main headline if none exists
 const mainHeadlineExists = db
@@ -390,11 +396,12 @@ export function getHeadlineWithDetails(id: number): (Headline & {
   submitter_username?: string;
   submission_created_at?: string;
   cached_content?: string;
+  summary?: string;
 }) | undefined {
   const stmt = db.prepare(`
     SELECT 
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
-      h.importance_score, h.mcafee_take,
+      h.importance_score, h.mcafee_take, h.summary,
       t.ticker, t.pump_url, t.token_name, t.mint_address, t.image_url as token_image_url,
       s.telegram_username as submitter_username, s.created_at as submission_created_at,
       s.cached_content
@@ -427,6 +434,7 @@ export function getHeadlineWithDetails(id: number): (Headline & {
     submitter_username: row.submitter_username || undefined,
     submission_created_at: row.submission_created_at || undefined,
     cached_content: row.cached_content || undefined,
+    summary: row.summary || undefined,
   };
 }
 
@@ -1122,6 +1130,15 @@ export function updateHeadlineImportanceScore(id: number, score: number): boolea
 export function updateHeadlineMcAfeeTake(id: number, take: string): boolean {
   const stmt = db.prepare(`UPDATE headlines SET mcafee_take = ? WHERE id = ?`);
   const result = stmt.run(take, id);
+  return result.changes > 0;
+}
+
+/**
+ * Update headline summary (for COTD project write-ups).
+ */
+export function updateHeadlineSummary(id: number, summary: string): boolean {
+  const stmt = db.prepare(`UPDATE headlines SET summary = ? WHERE id = ?`);
+  const result = stmt.run(summary, id);
   return result.changes > 0;
 }
 

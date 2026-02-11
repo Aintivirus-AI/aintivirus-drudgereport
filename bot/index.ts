@@ -43,8 +43,9 @@ import {
   getRecentSubmissionByUrl,
   updateHeadlineImportanceScore,
   updateHeadlineMcAfeeTake,
+  updateHeadlineSummary,
 } from "../lib/db";
-import { generateMcAfeeTake, scoreHeadlineImportance } from "../lib/mcafee-commentator";
+import { generateMcAfeeTake, scoreHeadlineImportance, generateCoinSummary } from "../lib/mcafee-commentator";
 
 // Session data interface
 interface SessionData {
@@ -1235,7 +1236,7 @@ bot.on("message:text", async (ctx) => {
         image_url: session.includeImage ? session.pendingImageUrl : undefined,
       });
 
-      // 3. AI enrichment — importance score + McAfee take (non-blocking)
+      // 3. AI enrichment — importance score + McAfee take + full summary (non-blocking)
       const pageContent = session.pendingPageContent || {
         title: session.pendingTitle || "",
         description: "",
@@ -1247,10 +1248,12 @@ bot.on("message:text", async (ctx) => {
       Promise.all([
         scoreHeadlineImportance(cotdTitle, pageContent),
         generateMcAfeeTake(cotdTitle, pageContent),
-      ]).then(([importanceScore, mcafeeTake]) => {
+        generateCoinSummary(cotdTitle, pageContent),
+      ]).then(([importanceScore, mcafeeTake, summary]) => {
         updateHeadlineImportanceScore(headlineId, importanceScore);
         updateHeadlineMcAfeeTake(headlineId, mcafeeTake);
-        console.log(`[COTD] AI enrichment for #${headlineId}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`);
+        updateHeadlineSummary(headlineId, summary);
+        console.log(`[COTD] AI enrichment for #${headlineId}: importance=${importanceScore}, summary=${summary.length} chars`);
       }).catch(err => {
         console.warn(`[COTD] AI enrichment failed (non-fatal):`, err);
       });
@@ -1614,7 +1617,7 @@ bot.on("message:text", async (ctx) => {
           image_url: session.includeImage ? session.pendingImageUrl : undefined,
         });
 
-        // 3. AI enrichment — importance score + McAfee take (non-blocking)
+        // 3. AI enrichment — importance score + McAfee take + full summary (non-blocking)
         const pageContent = session.pendingPageContent || {
           title: session.pendingTitle || "",
           description: description || "",
@@ -1626,10 +1629,12 @@ bot.on("message:text", async (ctx) => {
         Promise.all([
           scoreHeadlineImportance(cotdTitle, pageContent),
           generateMcAfeeTake(cotdTitle, pageContent),
-        ]).then(([importanceScore, mcafeeTake]) => {
+          generateCoinSummary(cotdTitle, pageContent),
+        ]).then(([importanceScore, mcafeeTake, summary]) => {
           updateHeadlineImportanceScore(headlineId, importanceScore);
           updateHeadlineMcAfeeTake(headlineId, mcafeeTake);
-          console.log(`[COTD] AI enrichment for #${headlineId}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`);
+          updateHeadlineSummary(headlineId, summary);
+          console.log(`[COTD] AI enrichment for #${headlineId}: importance=${importanceScore}, summary=${summary.length} chars`);
         }).catch(err => {
           console.warn(`[COTD] AI enrichment failed (non-fatal):`, err);
         });

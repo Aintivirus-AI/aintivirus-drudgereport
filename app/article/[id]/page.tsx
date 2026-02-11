@@ -119,19 +119,22 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </a>
         </div>
 
-        {/* Article Summary */}
+        {/* Article Summary — use headline summary (COTD) or cached_content (regular articles) */}
         {(() => {
-          let summary: string | null = null;
-          if (article.cached_content) {
+          let summary: string | null = article.summary || null;
+          if (!summary && article.cached_content) {
             try {
               const parsed = JSON.parse(article.cached_content);
-              // Use description first, fall back to truncated content
               summary = parsed.description || (parsed.content ? parsed.content.slice(0, 500) : null);
             } catch {
               // Invalid JSON — skip
             }
           }
           if (!summary) return null;
+
+          // COTD summaries are multi-paragraph; split into paragraphs for proper rendering
+          const paragraphs = summary.split(/\n\n+/).filter(Boolean);
+
           return (
             <div className="article-summary mb-8">
               <div className="article-summary-header">
@@ -142,10 +145,16 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round"/>
                   <line x1="10" y1="9" x2="8" y2="9" strokeLinecap="round"/>
                 </svg>
-                <span className="text-sm font-semibold text-white tracking-wide">SUMMARY</span>
+                <span className="text-sm font-semibold text-white tracking-wide">
+                  {article.summary ? "MCAFEE\u2019S TAKE" : "SUMMARY"}
+                </span>
                 <ListenButton text={summary} />
               </div>
-              <p className="article-summary-text">{summary}</p>
+              <div className="article-summary-text">
+                {paragraphs.map((p, i) => (
+                  <p key={i} className={i < paragraphs.length - 1 ? "mb-4" : ""}>{p}</p>
+                ))}
+              </div>
             </div>
           );
         })()}

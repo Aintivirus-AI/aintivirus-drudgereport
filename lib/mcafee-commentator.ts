@@ -125,3 +125,65 @@ Respond with ONLY a number between 0 and 100. Nothing else.`,
     return 50; // Default to moderate importance
   }
 }
+
+/**
+ * Generate a full project/coin summary for Coin of the Day articles.
+ * Written in McAfee's voice — informative but with personality.
+ */
+export async function generateCoinSummary(
+  headline: string,
+  content: PageContent
+): Promise<string> {
+  const safeHeadline = sanitizeForPrompt(headline, 200);
+  const safeContent = content.content
+    ? sanitizeForPrompt(content.content, 2000)
+    : "";
+  const safeDescription = content.description
+    ? sanitizeForPrompt(content.description, 500)
+    : "";
+
+  try {
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are the ghost of John McAfee writing a featured "Coin of the Day" deep-dive for The McAfee Report — a crypto news site.
+
+Your job: Write a compelling, informative summary of this crypto project/coin. Cover:
+- What the project does and why it matters
+- Key features and what makes it unique
+- The team or community behind it (if known)
+- Why crypto degens should pay attention
+
+Style rules:
+- Write 3-5 paragraphs, roughly 200-400 words total
+- Be informative first, entertaining second
+- Inject McAfee's personality — bold opinions, crypto-maximalist worldview, slight irreverence
+- No hashtags, no emojis
+- Don't start with "Ladies and gentlemen" or similar clichés
+- Write in first person as McAfee's ghost
+- Be honest — if information is limited, say so rather than making things up
+- End with a clear verdict or takeaway`,
+        },
+        {
+          role: "user",
+          content: `Write the Coin of the Day summary:\n\nHeadline: ${safeHeadline}\n${safeDescription ? `Description: ${safeDescription}\n` : ""}${safeContent ? `\nPage content:\n${safeContent}` : ""}`,
+        },
+      ],
+      max_tokens: 800,
+      temperature: 0.9,
+    });
+
+    const summary = response.choices[0]?.message?.content?.trim();
+    if (!summary) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    console.log(`[McAfee] Generated COTD summary (${summary.length} chars)`);
+    return summary;
+  } catch (error) {
+    console.error("[McAfee] Failed to generate coin summary:", error);
+    return "Even from beyond the grave, this project caught my attention. Check it out for yourself — do your own research, as they say. Though I never did follow that advice myself.";
+  }
+}
