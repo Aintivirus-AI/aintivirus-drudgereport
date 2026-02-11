@@ -47,6 +47,16 @@
   --content-neon-cyan: #1a56db;
   --content-neon-purple: #4a6274;
   --content-grid-line: rgba(0, 0, 0, 0.03);
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+
+[data-theme="light"] body {
+  font-weight: 450;
+}
+
+[data-theme="light"] .neon-link {
+  font-weight: 500;
 }
 
 * {
