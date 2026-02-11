@@ -2029,21 +2029,6 @@ body.nav-no-scroll {
   display: none;
 }
 
-@media (max-width: 768px) {
-  .article-chat-mobile-toggle {
-    display: block;
-    margin-bottom: 0.75rem;
-  }
-
-  .article-chat {
-    display: none;
-  }
-
-  .article-chat--open {
-    display: flex;
-  }
-}
-
 .article-chat-toggle {
   display: inline-flex;
   align-items: center;
@@ -2066,6 +2051,8 @@ body.nav-no-scroll {
   border-color: rgba(0, 255, 255, 0.4);
 }
 
+/* Base chat styles — must come BEFORE the mobile media query so the
+   mobile `display: none` override wins (same specificity, later source order). */
 .article-chat {
   display: flex;
   flex-direction: column;
@@ -2074,6 +2061,21 @@ body.nav-no-scroll {
   background: rgba(0, 255, 255, 0.03);
   overflow: hidden;
   max-height: 520px;
+}
+
+@media (max-width: 768px) {
+  .article-chat-mobile-toggle {
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+
+  .article-chat {
+    display: none;
+  }
+
+  .article-chat--open {
+    display: flex;
+  }
 }
 
 .article-chat-header {
