@@ -62,8 +62,30 @@ export async function checkDeploymentBalance(): Promise<{
   };
 }
 
-/** Generate a new keypair for the token mint. */
+/** Generate a vanity keypair whose base58 address ends in "pump".
+ *  Brute-forces random keypairs — typically finds a match in 2-5 seconds. */
 function generateMintKeypair(): Keypair {
+  const SUFFIX = "pump";
+  const MAX_ATTEMPTS = 10_000_000; // safety cap
+  const LOG_INTERVAL = 500_000;
+
+  console.log(`[PumpDeployer] Grinding for vanity mint address ending in "${SUFFIX}"...`);
+  const start = Date.now();
+
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const kp = Keypair.generate();
+    if (kp.publicKey.toBase58().endsWith(SUFFIX)) {
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      console.log(`[PumpDeployer] Found vanity address in ${elapsed}s after ${i + 1} attempts: ${kp.publicKey.toBase58()}`);
+      return kp;
+    }
+    if (i > 0 && i % LOG_INTERVAL === 0) {
+      console.log(`[PumpDeployer] ...${i.toLocaleString()} attempts so far (${((Date.now() - start) / 1000).toFixed(1)}s)`);
+    }
+  }
+
+  // Extremely unlikely fallback — use a random address rather than stalling deployment
+  console.warn(`[PumpDeployer] Vanity grind hit ${MAX_ATTEMPTS.toLocaleString()} cap, using random address`);
   return Keypair.generate();
 }
 
