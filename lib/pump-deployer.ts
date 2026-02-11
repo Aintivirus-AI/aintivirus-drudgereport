@@ -103,7 +103,8 @@ async function uploadMetadataToPumpFun(
   name: string,
   symbol: string,
   description: string,
-  imageUrl: string
+  imageUrl: string,
+  sourceUrl?: string
 ): Promise<string> {
   console.log(`[PumpDeployer] Uploading metadata to IPFS...`);
 
@@ -114,9 +115,9 @@ async function uploadMetadataToPumpFun(
   formData.append("name", name);
   formData.append("symbol", symbol);
   formData.append("description", description);
-  formData.append("twitter", "");
-  formData.append("telegram", "");
-  formData.append("website", "");
+  formData.append("twitter", "https://x.com/TheMcAfeeReport");
+  formData.append("telegram", "https://t.me/mcafeereport_bot");
+  formData.append("website", sourceUrl || "");
   formData.append("showName", "true");
 
   const controller = new AbortController();
@@ -149,11 +150,12 @@ async function uploadMetadataWithRetry(
   symbol: string,
   description: string,
   imageUrl: string,
+  sourceUrl?: string,
   maxAttempts: number = 3
 ): Promise<string | null> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await uploadMetadataToPumpFun(name, symbol, description, imageUrl);
+      return await uploadMetadataToPumpFun(name, symbol, description, imageUrl, sourceUrl);
     } catch (error) {
       console.error(
         `[PumpDeployer] Metadata upload attempt ${attempt}/${maxAttempts} failed:`,
@@ -320,7 +322,8 @@ export async function deployToken(
   metadata: TokenMetadata,
   submitterSolAddress: string,
   headlineId?: number,
-  submissionId?: number
+  submissionId?: number,
+  sourceUrl?: string
 ): Promise<DeploymentResult> {
   console.log(
     `[PumpDeployer] Starting deployment for "${metadata.name}" (${metadata.ticker})`
@@ -341,19 +344,35 @@ export async function deployToken(
 
     console.log(`[PumpDeployer] Wallet balance: ${balanceCheck.balance} SOL`);
 
-    // Persist the token image to permanent storage before deployment
+    // Persist the token logo to permanent storage (used on the site)
     let persistedImageUrl = metadata.imageUrl;
     try {
       persistedImageUrl = await persistImage(
         metadata.imageUrl,
         metadata.ticker
       );
-      console.log(`[PumpDeployer] Image persisted: ${persistedImageUrl}`);
+      console.log(`[PumpDeployer] Logo persisted: ${persistedImageUrl}`);
     } catch (imgError) {
       console.warn(
-        `[PumpDeployer] Image persistence failed, using original URL:`,
+        `[PumpDeployer] Logo persistence failed, using original URL:`,
         imgError
       );
+    }
+
+    // Persist the banner image for pump.fun upload
+    let persistedBannerUrl = metadata.bannerUrl;
+    try {
+      persistedBannerUrl = await persistImage(
+        metadata.bannerUrl,
+        `${metadata.ticker}-banner`
+      );
+      console.log(`[PumpDeployer] Banner persisted: ${persistedBannerUrl}`);
+    } catch (imgError) {
+      console.warn(
+        `[PumpDeployer] Banner persistence failed, falling back to logo:`,
+        imgError
+      );
+      persistedBannerUrl = persistedImageUrl;
     }
 
     // Generate mint keypair
@@ -361,20 +380,19 @@ export async function deployToken(
     const mintAddress = mintKeypair.publicKey.toBase58();
     console.log(`[PumpDeployer] Generated mint address: ${mintAddress}`);
 
-    // Token description
-    const description =
-      "News token for breaking news. Powered by The McAfee Report.";
+    // Use AI-generated description from metadata
+    const description = metadata.description;
 
-    // Use the persisted path as-is — downloadImageAsBlob handles local
-    // paths by reading from disk (avoids HTTP 404 in Next.js production)
-    const imageUrlForUpload = persistedImageUrl;
+    // Use banner for pump.fun upload, logo stays on the site
+    const imageUrlForUpload = persistedBannerUrl;
 
     // Upload metadata to IPFS (with retry)
     const metadataUri = await uploadMetadataWithRetry(
       metadata.name,
       metadata.ticker,
       description,
-      imageUrlForUpload
+      imageUrlForUpload,
+      sourceUrl
     );
 
     if (!metadataUri) {

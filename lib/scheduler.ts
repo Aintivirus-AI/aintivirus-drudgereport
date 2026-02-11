@@ -334,7 +334,8 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
         tokenMetadata,
         submission.sol_address,
         headlineRecord.id,
-        submission.id
+        submission.id,
+        submission.url
       );
 
       if (deployResult.success) {

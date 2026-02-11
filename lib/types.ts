@@ -164,6 +164,8 @@ export interface TokenMetadata {
   name: string;
   ticker: string;
   imageUrl: string;
+  bannerUrl: string;
+  description: string;
 }
 
 // ============= VOTE TYPES =============
