@@ -3325,6 +3325,60 @@ body.nav-no-scroll {
 }
 
 /* ========================================
+   MOBILE HEADLINE FILTER TABS
+   ======================================== */
+
+.mobile-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-filter-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.mobile-filter-tab--active {
+  color: var(--neon-cyan);
+  background: rgba(0, 211, 255, 0.08);
+  border-color: rgba(0, 211, 255, 0.25);
+}
+
+.mobile-filter-tab--active:hover {
+  background: rgba(0, 211, 255, 0.12);
+  border-color: rgba(0, 211, 255, 0.35);
+}
+
+[data-theme="light"] .mobile-filter-tab {
+  color: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .mobile-filter-tab:hover {
+  color: rgba(0, 0, 0, 0.65);
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .mobile-filter-tab--active {
+  color: #0891b2;
+  background: rgba(8, 145, 178, 0.08);
+  border-color: rgba(8, 145, 178, 0.25);
+}
+
+/* ========================================
    SUBMIT CTA (How to Earn)
    ======================================== */
 

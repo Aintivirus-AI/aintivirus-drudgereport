@@ -1,5 +1,6 @@
 import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
+import { MobileHeadlineList } from "@/components/MobileHeadlineList";
 import { TokenTicker } from "@/components/TokenTicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
@@ -65,10 +66,9 @@ export default function Home() {
             <MainHeadline headline={mainHeadline} />
           </div>
 
-          {/* Mobile: Columns */}
-          <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-8">
-            <HeadlineColumn headlines={leftHeadlines} />
-            <HeadlineColumn headlines={rightHeadlines} />
+          {/* Mobile: Unified headline list with sort filters */}
+          <div className="lg:hidden">
+            <MobileHeadlineList headlines={allSidebarHeadlines} />
           </div>
 
           {/* Desktop: Three column layout */}
