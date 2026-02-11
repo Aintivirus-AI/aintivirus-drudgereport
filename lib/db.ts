@@ -313,6 +313,10 @@ export function addHeadline(
 /**
  * Remove a headline by ID.
  * Cleans up related votes, tokens, and revenue events to avoid FK constraint errors.
+ *
+ * Order matters: headlines.token_id references tokens(id), so we must NULL out
+ * the headline's token_id BEFORE deleting the tokens it points to. Otherwise
+ * SQLite raises SQLITE_CONSTRAINT_FOREIGNKEY.
  */
 export function removeHeadline(id: number): boolean {
   const txn = db.transaction(() => {
@@ -324,6 +328,11 @@ export function removeHeadline(id: number): boolean {
     for (const token of tokens) {
       db.prepare("DELETE FROM revenue_events WHERE token_id = ?").run(token.id);
     }
+
+    // Clear the headline's FK reference to its token BEFORE deleting the token.
+    // Without this, DELETE FROM tokens fails because headlines.token_id still
+    // points to the token row we're trying to remove.
+    db.prepare("UPDATE headlines SET token_id = NULL WHERE id = ?").run(id);
 
     // Delete tokens linked to this headline
     db.prepare("DELETE FROM tokens WHERE headline_id = ?").run(id);
@@ -1028,24 +1037,53 @@ export function getRevenueStats(): { total: number; distributed: number; burned:
 // ============= UTILITY =============
 
 /**
- * Clean up old headlines (optional maintenance function)
+ * Clean up old headlines (optional maintenance function).
+ * Uses a transaction to safely remove headlines and all their child records
+ * (votes, revenue events, tokens) to avoid FK constraint errors.
  */
 export function cleanupOldHeadlines(keepCount: number = 100): number {
-  // Get IDs to keep (most recent `keepCount` per column)
-  const stmt = db.prepare(`
-    DELETE FROM headlines
-    WHERE id NOT IN (
-      SELECT id FROM (
-        SELECT id FROM headlines WHERE column = 'left' ORDER BY created_at DESC LIMIT ?
-        UNION ALL
-        SELECT id FROM headlines WHERE column = 'right' ORDER BY created_at DESC LIMIT ?
-        UNION ALL
-        SELECT id FROM headlines WHERE column = 'center' ORDER BY created_at DESC LIMIT ?
+  const txn = db.transaction(() => {
+    // Find IDs that will be deleted
+    const toDelete = db.prepare(`
+      SELECT id FROM headlines
+      WHERE id NOT IN (
+        SELECT id FROM (
+          SELECT id FROM headlines WHERE "column" = 'left' ORDER BY created_at DESC LIMIT ?
+          UNION ALL
+          SELECT id FROM headlines WHERE "column" = 'right' ORDER BY created_at DESC LIMIT ?
+          UNION ALL
+          SELECT id FROM headlines WHERE "column" = 'center' ORDER BY created_at DESC LIMIT ?
+        )
       )
-    )
-  `);
-  const result = stmt.run(keepCount, keepCount, keepCount);
-  return result.changes;
+    `).all(keepCount, keepCount, keepCount) as { id: number }[];
+
+    if (toDelete.length === 0) return 0;
+
+    for (const { id } of toDelete) {
+      // Delete votes
+      db.prepare("DELETE FROM votes WHERE headline_id = ?").run(id);
+
+      // Delete revenue events for tokens linked to this headline
+      const tokens = db.prepare("SELECT id FROM tokens WHERE headline_id = ?").all(id) as { id: number }[];
+      for (const token of tokens) {
+        db.prepare("DELETE FROM revenue_events WHERE token_id = ?").run(token.id);
+      }
+
+      // Clear the headline's FK reference to its token
+      db.prepare("UPDATE headlines SET token_id = NULL WHERE id = ?").run(id);
+
+      // Delete tokens linked to this headline
+      db.prepare("DELETE FROM tokens WHERE headline_id = ?").run(id);
+    }
+
+    // Now safely delete the headlines
+    const ids = toDelete.map((r) => r.id);
+    const placeholders = ids.map(() => "?").join(", ");
+    const result = db.prepare(`DELETE FROM headlines WHERE id IN (${placeholders})`).run(...ids);
+    return result.changes;
+  });
+
+  return txn();
 }
 
 /**
