@@ -216,10 +216,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             {article.mint_address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(article.mint_address) && (
               <div className="mt-6 rounded-lg overflow-hidden border border-dark-200/30">
                 <iframe
-                  src={`https://dexscreener.com/solana/${article.mint_address}?embed=1&theme=dark&info=0`}
-                  className="w-full h-[400px] border-0"
+                  src={`https://dexscreener.com/solana/${article.mint_address}?embed=1&theme=dark&info=0&chartLeftToolbar=0&chartTheme=dark`}
+                  className="w-full border-0"
+                  style={{ height: "600px" }}
                   title={`${article.token?.ticker || 'Token'} chart`}
                   loading="lazy"
+                  allow="clipboard-write"
                 />
                 <a
                   href={`https://dexscreener.com/solana/${article.mint_address}`}
