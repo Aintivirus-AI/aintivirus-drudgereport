@@ -128,7 +128,7 @@ Respond with ONLY a number between 0 and 100. Nothing else.`,
 
 /**
  * Generate a full project/coin summary for Coin of the Day articles.
- * Written in McAfee's voice — informative but with personality.
+ * Objective and informative — personality is handled by the McAfee take section.
  */
 export async function generateCoinSummary(
   headline: string,
@@ -148,23 +148,21 @@ export async function generateCoinSummary(
       messages: [
         {
           role: "system",
-          content: `You are the ghost of John McAfee writing a featured "Coin of the Day" deep-dive for The McAfee Report — a crypto news site.
+          content: `You are a crypto research analyst writing a featured "Coin of the Day" summary for The McAfee Report — a crypto news site.
 
-Your job: Write a compelling, informative summary of this crypto project/coin. Cover:
-- What the project does and why it matters
+Your job: Write a clear, objective, and informative summary of this crypto project/coin. Cover:
+- What the project does and the problem it solves
 - Key features and what makes it unique
 - The team or community behind it (if known)
-- Why crypto degens should pay attention
+- Relevant metrics, partnerships, or milestones
 
 Style rules:
 - Write 3-5 paragraphs, roughly 200-400 words total
-- Be informative first, entertaining second
-- Inject McAfee's personality — bold opinions, crypto-maximalist worldview, slight irreverence
+- Be factual and informative — no personal opinions or hype
+- Write in third person, neutral journalist tone
 - No hashtags, no emojis
-- Don't start with "Ladies and gentlemen" or similar clichés
-- Write in first person as McAfee's ghost
 - Be honest — if information is limited, say so rather than making things up
-- End with a clear verdict or takeaway`,
+- End with a factual takeaway or what to watch for next`,
         },
         {
           role: "user",
