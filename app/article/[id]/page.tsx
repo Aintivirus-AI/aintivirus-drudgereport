@@ -212,25 +212,27 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               </div>
             </div>
 
-            {/* Pump.fun chart link */}
+            {/* DexScreener live chart */}
             {article.mint_address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(article.mint_address) && (
-              <a
-                href={`https://pump.fun/coin/${article.mint_address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 flex items-center justify-center gap-3 rounded-lg border border-dark-200/30 bg-black/40 hover:bg-black/60 hover:border-neon-cyan/30 transition-all py-6 group"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-neon-cyan opacity-70 group-hover:opacity-100 transition-opacity">
-                  <path d="M3 3v18h18" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M7 16l4-8 4 4 5-9" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="text-gray-400 group-hover:text-white transition-colors text-sm font-medium">
-                  View live chart on pump.fun
-                </span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-gray-600 group-hover:text-neon-cyan transition-colors">
-                  <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </a>
+              <div className="mt-6 rounded-lg overflow-hidden border border-dark-200/30">
+                <iframe
+                  src={`https://dexscreener.com/solana/${article.mint_address}?embed=1&theme=dark&info=0`}
+                  className="w-full h-[400px] border-0"
+                  title={`${article.token?.ticker || 'Token'} chart`}
+                  loading="lazy"
+                />
+                <a
+                  href={`https://dexscreener.com/solana/${article.mint_address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-black/40 hover:bg-black/60 transition-colors text-sm text-gray-400 hover:text-white"
+                >
+                  Open full chart on DexScreener
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                    <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </a>
+              </div>
             )}
 
             <p className="text-xs text-gray-500 mt-4">
