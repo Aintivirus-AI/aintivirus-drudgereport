@@ -74,21 +74,23 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                   {isCotdCard ? (
                     <a
                       href={articlePath}
-                      className="cotd-badge inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                      className="cotd-badge headline-badge-fixed inline-flex items-center justify-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3 flex-shrink-0">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       Coin of the Day
                     </a>
                   ) : headline.token ? (
-                    <TokenBadge 
-                      pumpUrl={headline.token.pump_url} 
-                      ticker={headline.token.ticker}
-                      imageUrl={headline.token.image_url}
-                      priceChange={headline.token.price_change_24h}
-                      size="sm"
-                    />
+                    <span className="headline-badge-fixed">
+                      <TokenBadge 
+                        pumpUrl={headline.token.pump_url} 
+                        ticker={headline.token.ticker}
+                        imageUrl={headline.token.image_url}
+                        priceChange={headline.token.price_change_24h}
+                        size="sm"
+                      />
+                    </span>
                   ) : null}
                 </div>
                 <div className="w-1/2 flex items-center justify-end gap-2">
@@ -143,22 +145,24 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
             {isCotd ? (
               <a
                 href={articlePath}
-                className="cotd-badge inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                className="cotd-badge headline-badge-fixed inline-flex items-center justify-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3 flex-shrink-0">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Coin of the Day
               </a>
             ) : headline.token ? (
-              <TokenBadge 
-                pumpUrl={headline.token.pump_url} 
-                ticker={headline.token.ticker}
-                imageUrl={headline.token.image_url}
-                priceChange={headline.token.price_change_24h}
-                showTicker={false}
-                size="sm"
-              />
+              <span className="headline-badge-fixed">
+                <TokenBadge 
+                  pumpUrl={headline.token.pump_url} 
+                  ticker={headline.token.ticker}
+                  imageUrl={headline.token.image_url}
+                  priceChange={headline.token.price_change_24h}
+                  showTicker={false}
+                  size="sm"
+                />
+              </span>
             ) : null}
           </div>
           <div className="w-1/2 flex items-center justify-end gap-2">

@@ -1414,6 +1414,17 @@ body.nav-no-scroll {
   stroke: #b45309;
 }
 
+/* Fixed-width wrapper so all headline badges are the same size */
+.headline-badge-fixed {
+  display: inline-flex;
+  width: 100%;
+}
+.headline-badge-fixed > a,
+.headline-badge-fixed > .token-badge {
+  width: 100%;
+  justify-content: center;
+}
+
 /* ============= TOKEN BADGE ============= */
 .token-badge-up {
   background: rgba(34, 197, 94, 0.2);
