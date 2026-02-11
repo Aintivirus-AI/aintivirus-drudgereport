@@ -8,7 +8,7 @@ export function ArticleButton({ url }: { url: string }) {
   return (
     <a
       href={url}
-      className="inline-flex items-center justify-center w-5 h-5 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity duration-200 text-gray-400 hover:text-neon-cyan flex-shrink-0"
+      className="inline-flex items-center justify-center w-5 h-5 rounded opacity-60 hover:opacity-100 transition-opacity duration-200 text-gray-400 hover:text-neon-cyan flex-shrink-0"
       title="View article page"
       onClick={(e) => e.stopPropagation()}
     >

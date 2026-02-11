@@ -15,7 +15,7 @@ export function ShareButton({ title, url, ticker }: { title: string; url: string
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center justify-center w-5 h-5 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity duration-200 text-gray-400 hover:text-white flex-shrink-0"
+      className="inline-flex items-center justify-center w-5 h-5 rounded opacity-60 hover:opacity-100 transition-opacity duration-200 text-gray-400 hover:text-white flex-shrink-0"
       title="Share on X"
       onClick={(e) => e.stopPropagation()}
     >
