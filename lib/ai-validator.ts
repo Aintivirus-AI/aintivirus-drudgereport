@@ -1084,9 +1084,17 @@ export async function fetchTwitterContent(url: string): Promise<PageContent> {
       ? oembedData.author_url.replace(/^https?:\/\/(twitter|x)\.com\//i, "@")
       : "";
 
-    const title = authorHandle
-      ? `${authorName} (${authorHandle})`
-      : authorName || "Tweet";
+    // Use the actual tweet text as the title/headline — NOT the author name.
+    // The author name alone ("Anthropic (@AnthropicAI)") is useless as a
+    // headline. The tweet content is what people care about.
+    // Truncate to ~200 chars for headline purposes; full text stays in content.
+    const authorTag = authorHandle || authorName;
+    const title = tweetText
+      ? tweetText.substring(0, 200) + (tweetText.length > 200 ? "…" : "")
+      : `Tweet from ${authorTag}`;
+    const description = authorTag
+      ? `${authorName} (${authorHandle}): ${tweetText}`.substring(0, 300)
+      : tweetText.substring(0, 300);
 
     // Try to get tweet image and date from the page OG tags as fallback.
     // Twitter/X pages often include article:published_time or og:updated_time
@@ -1103,7 +1111,7 @@ export async function fetchTwitterContent(url: string): Promise<PageContent> {
 
     return {
       title,
-      description: tweetText.substring(0, 300),
+      description,
       content: tweetText,
       imageUrl,
       publishedAt,
