@@ -320,6 +320,8 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
     // Generate token metadata and deploy
     let deployedTicker: string | undefined;
     let deployedPumpUrl: string | undefined;
+    let deployedDescription: string | undefined;
+    let deployedImageUrl: string | undefined;
 
     try {
       console.log(
@@ -341,6 +343,8 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       if (deployResult.success) {
         deployedTicker = tokenMetadata.ticker;
         deployedPumpUrl = deployResult.pumpUrl;
+        deployedDescription = tokenMetadata.description;
+        deployedImageUrl = tokenMetadata.imageUrl;
         ActivityLog.tokenMinted(tokenMetadata.ticker, headline, deployResult.mintAddress);
         console.log(
           `[Scheduler] Token deployed: ${deployResult.mintAddress}`
@@ -389,6 +393,8 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
           ticker: deployedTicker,
           pumpUrl: deployedPumpUrl,
           articleUrl: `${SITE_URL}/article/${headlineRecord.id}`,
+          description: deployedDescription,
+          imageUrl: deployedImageUrl,
         });
         if (tweetResult.success) {
           console.log(`[Scheduler] Tweeted: ${tweetResult.tweetId}`);
