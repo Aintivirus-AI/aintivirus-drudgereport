@@ -1199,9 +1199,11 @@ bot.on("message:text", async (ctx) => {
   // Handle /skip for COTD description
   if (text === "/skip" && session.step === "awaiting_cotd_description") {
     try {
+      const cotdTitle = `Coin Of The Day: ${session.pendingTitle}`;
+
       // 1. Create a normal headline (no token will be minted)
       const headlineRes = await apiRequest("/headlines", "POST", {
-        title: session.pendingTitle,
+        title: cotdTitle,
         url: session.pendingUrl,
         image_url: session.includeImage ? session.pendingImageUrl : undefined,
       });
@@ -1216,7 +1218,7 @@ bot.on("message:text", async (ctx) => {
 
       // 2. Update coin_of_the_day pointer to the article page
       await apiRequest("/coin-of-the-day", "PUT", {
-        title: session.pendingTitle,
+        title: cotdTitle,
         url: articleUrl,
         image_url: session.includeImage ? session.pendingImageUrl : undefined,
       });
@@ -1228,13 +1230,11 @@ bot.on("message:text", async (ctx) => {
         content: "",
         imageUrl: null,
       };
-      const headlineTitle = session.pendingTitle || "";
       const headlineId = headline.id;
 
-      // Run in background — don't block the reply
       Promise.all([
-        scoreHeadlineImportance(headlineTitle, pageContent),
-        generateMcAfeeTake(headlineTitle, pageContent),
+        scoreHeadlineImportance(cotdTitle, pageContent),
+        generateMcAfeeTake(cotdTitle, pageContent),
       ]).then(([importanceScore, mcafeeTake]) => {
         updateHeadlineImportanceScore(headlineId, importanceScore);
         updateHeadlineMcAfeeTake(headlineId, mcafeeTake);
@@ -1246,7 +1246,7 @@ bot.on("message:text", async (ctx) => {
       await ctx.reply(
         `*Coin of the Day published*\n` +
         `─────────────────────\n\n` +
-        `Title: ${escapeMarkdown(session.pendingTitle || "")}\n` +
+        `Title: ${escapeMarkdown(cotdTitle)}\n` +
         `Article: \`${API_URL}${articleUrl}\`\n` +
         `Source: \`${session.pendingUrl || ""}\`\n` +
         `${session.includeImage ? "Image: included\n" : ""}` +
@@ -1564,11 +1564,12 @@ bot.on("message:text", async (ctx) => {
 
     case "awaiting_cotd_description": {
       const description = text === "/skip" ? undefined : text;
+      const cotdTitle = `Coin Of The Day: ${session.pendingTitle}`;
 
       try {
         // 1. Create a normal headline (no token will be minted)
         const headlineRes = await apiRequest("/headlines", "POST", {
-          title: session.pendingTitle,
+          title: cotdTitle,
           url: session.pendingUrl,
           image_url: session.includeImage ? session.pendingImageUrl : undefined,
         });
@@ -1583,7 +1584,7 @@ bot.on("message:text", async (ctx) => {
 
         // 2. Update coin_of_the_day pointer to the article page
         await apiRequest("/coin-of-the-day", "PUT", {
-          title: session.pendingTitle,
+          title: cotdTitle,
           url: articleUrl,
           description,
           image_url: session.includeImage ? session.pendingImageUrl : undefined,
@@ -1596,12 +1597,11 @@ bot.on("message:text", async (ctx) => {
           content: "",
           imageUrl: null,
         };
-        const headlineTitle = session.pendingTitle || "";
         const headlineId = headline.id;
 
         Promise.all([
-          scoreHeadlineImportance(headlineTitle, pageContent),
-          generateMcAfeeTake(headlineTitle, pageContent),
+          scoreHeadlineImportance(cotdTitle, pageContent),
+          generateMcAfeeTake(cotdTitle, pageContent),
         ]).then(([importanceScore, mcafeeTake]) => {
           updateHeadlineImportanceScore(headlineId, importanceScore);
           updateHeadlineMcAfeeTake(headlineId, mcafeeTake);
@@ -1613,7 +1613,7 @@ bot.on("message:text", async (ctx) => {
         await ctx.reply(
           `*Coin of the Day published*\n` +
           `─────────────────────\n\n` +
-          `Title: ${escapeMarkdown(session.pendingTitle || "")}\n` +
+          `Title: ${escapeMarkdown(cotdTitle)}\n` +
           `Article: \`${API_URL}${articleUrl}\`\n` +
           `Source: \`${session.pendingUrl || ""}\`\n` +
           `${description ? `Description: ${escapeMarkdown(description)}\n` : ""}` +
