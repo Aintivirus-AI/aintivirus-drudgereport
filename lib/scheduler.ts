@@ -28,6 +28,7 @@ import { notifySubmitterPublished } from "./telegram-notifier";
 import { tweetArticlePublished, isTwitterConfigured } from "./twitter-poster";
 import { generateMcAfeeTake, scoreHeadlineImportance } from "./mcafee-commentator";
 import { ActivityLog } from "./activity-logger";
+import { ensureEnglish } from "./translator";
 import type { Submission, PageContent } from "./types";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -222,7 +223,34 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       content = await smartFetchContent(submission.url);
     }
 
-    // Use the fetched title as the headline
+    // Translate non-English content to English
+    const translated = await ensureEnglish(
+      content.title || "",
+      content.description || ""
+    );
+    if (translated.translated) {
+      console.log(
+        `[Scheduler] Translated from ${translated.detectedLanguage}: "${content.title}" → "${translated.title}"`
+      );
+      content.title = translated.title;
+      content.description = translated.description;
+
+      // Update cached content so article summary also shows English
+      try {
+        const updatedCache = {
+          title: content.title,
+          description: content.description,
+          content: content.content,
+          imageUrl: content.imageUrl,
+          publishedAt: content.publishedAt?.toISOString() || null,
+        };
+        updateSubmissionCachedContent(submission.id, JSON.stringify(updatedCache));
+      } catch {
+        // Non-fatal — headline will still be in English
+      }
+    }
+
+    // Use the (possibly translated) title as the headline
     const headline = content.title || "Breaking News";
 
     // Alternate left/right column based on ID

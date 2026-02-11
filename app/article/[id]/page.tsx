@@ -8,6 +8,7 @@ import { ListenButton } from "@/components/ListenButton";
 import { TimeAgo } from "@/components/TimeAgo";
 import { McAfeeCommentary } from "@/components/McAfeeCommentary";
 import { VoteButtons } from "@/components/VoteButtons";
+import { SubmitCTA } from "@/components/SubmitCTA";
 
 export const revalidate = 30;
 
@@ -240,19 +241,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <CopyLinkButton url={articleUrl} />
         </div>
 
-        {/* CTA */}
-        <div className="border-t border-dark-200/30 pt-8 text-center">
-          <p className="text-gray-400 text-sm mb-2">
-            Got breaking news? Submit it and earn crypto rewards.
-          </p>
-          <a
-            href="https://t.me/AIntivirus"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30 hover:bg-neon-cyan/30 transition-colors font-semibold"
-          >
-            Submit News via Telegram
-          </a>
+        {/* How to Earn CTA */}
+        <div className="border-t border-dark-200/30 pt-8">
+          <SubmitCTA />
         </div>
       </div>
     </main>

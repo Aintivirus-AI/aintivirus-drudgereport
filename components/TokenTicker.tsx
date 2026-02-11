@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { EarnModal } from "./EarnModal";
 
 const CA = "7Epmyp9dMD5SzUtxczbuWwsVARyWdzLFAkzxnvZWpump";
 const PUMP_URL = `https://pump.fun/coin/${CA}`;
 
 export function TokenTicker() {
   const [copied, setCopied] = useState(false);
+  const [earnOpen, setEarnOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clean up timer on unmount
@@ -63,7 +65,27 @@ export function TokenTicker() {
             </svg>
           )}
         </button>
+
+        {/* Separator */}
+        <span className="token-ticker-sep" />
+
+        {/* Quick links */}
+        <a href="/leaderboard" className="token-ticker-link token-ticker-link--gold">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+            <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Leaderboard
+        </a>
+        <span className="token-ticker-sep" />
+        <button
+          onClick={() => setEarnOpen(true)}
+          className="token-ticker-link token-ticker-link--rainbow"
+        >
+          Earn Now
+        </button>
       </div>
+
+      <EarnModal open={earnOpen} onClose={() => setEarnOpen(false)} />
     </div>
   );
 }

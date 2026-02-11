@@ -101,6 +101,7 @@ export default function Home() {
                 </div>
               )}
             </div>
+
           </div>
 
           {/* Mobile: Divider between hot topics and columns */}
@@ -159,6 +160,7 @@ export default function Home() {
                   </div>
                 )}
               </div>
+
             </div>
 
             {/* Right Column */}

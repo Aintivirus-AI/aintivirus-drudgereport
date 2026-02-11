@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTopSubmitters, getRecentTokenLaunches, getPublishedTodayCount } from "@/lib/db";
 import { TokenBadge } from "@/components/TokenBadge";
+import { SubmitCTA } from "@/components/SubmitCTA";
 
 export const revalidate = 30;
 
@@ -152,20 +153,10 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
-        {/* CTA */}
-        <div className="mt-12 text-center border-t border-dark-200/30 pt-8">
-          <h3 className="text-xl font-bold text-white mb-2">Want to be on this leaderboard?</h3>
-          <p className="text-gray-400 text-sm mb-4">
-            Submit breaking news to The McAfee Report via Telegram. If published, a token launches and you earn 50% of creator fees.
-          </p>
-          <a
-            href="https://t.me/AIntivirus"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30 hover:bg-neon-cyan/30 transition-colors font-semibold"
-          >
-            Submit News via Telegram
-          </a>
+        {/* How to Earn CTA */}
+        <div className="mt-12 border-t border-dark-200/30 pt-8">
+          <h3 className="text-lg font-bold text-white mb-4 text-center">Want to be on this leaderboard?</h3>
+          <SubmitCTA />
         </div>
       </div>
     </main>
