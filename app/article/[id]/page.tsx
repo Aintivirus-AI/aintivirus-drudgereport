@@ -10,6 +10,7 @@ import { McAfeeCommentary } from "@/components/McAfeeCommentary";
 import { VoteButtons } from "@/components/VoteButtons";
 import { SubmitCTA } from "@/components/SubmitCTA";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ArticleChat } from "@/components/ArticleChat";
 
 export const revalidate = 30;
 
@@ -61,6 +62,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const publishedDate = new Date(article.created_at);
 
+  // Extract summary for both the Summary box and the chatbot context
+  let articleSummary: string | null = article.summary || null;
+  if (!articleSummary && article.cached_content) {
+    try {
+      const parsed = JSON.parse(article.cached_content);
+      articleSummary = parsed.description || (parsed.content ? parsed.content.slice(0, 500) : null);
+    } catch {
+      // Invalid JSON — skip
+    }
+  }
+
   return (
     <main className="main-content">
       <div className="min-h-screen grid-bg">
@@ -79,7 +91,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Hero image */}
         {article.image_url && (
           <div className="rounded-lg overflow-hidden border border-dark-200/30 mb-8">
@@ -124,43 +136,39 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </a>
         </div>
 
-        {/* Article Summary — use headline summary (COTD) or cached_content (regular articles) */}
-        {(() => {
-          let summary: string | null = article.summary || null;
-          if (!summary && article.cached_content) {
-            try {
-              const parsed = JSON.parse(article.cached_content);
-              summary = parsed.description || (parsed.content ? parsed.content.slice(0, 500) : null);
-            } catch {
-              // Invalid JSON — skip
-            }
-          }
-          if (!summary) return null;
-
-          // COTD summaries are multi-paragraph; split into paragraphs for proper rendering
-          const paragraphs = summary.split(/\n\n+/).filter(Boolean);
-
-          return (
-            <div className="article-summary mb-8">
-              <div className="article-summary-header">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-neon-cyan">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
-                  <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="16" y1="13" x2="8" y2="13" strokeLinecap="round"/>
-                  <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round"/>
-                  <line x1="10" y1="9" x2="8" y2="9" strokeLinecap="round"/>
-                </svg>
-                <span className="text-sm font-semibold text-white tracking-wide">SUMMARY</span>
-                <ListenButton text={summary} />
+        {/* Article Summary + AI Chat Grid */}
+        <div className="article-summary-chat-grid mb-8">
+          {/* Left: Summary */}
+          {articleSummary && (() => {
+            const paragraphs = articleSummary.split(/\n\n+/).filter(Boolean);
+            return (
+              <div className="article-summary">
+                <div className="article-summary-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-neon-cyan">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="16" y1="13" x2="8" y2="13" strokeLinecap="round"/>
+                    <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round"/>
+                    <line x1="10" y1="9" x2="8" y2="9" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-sm font-semibold text-white tracking-wide">SUMMARY</span>
+                  <ListenButton text={articleSummary} />
+                </div>
+                <div className="article-summary-text">
+                  {paragraphs.map((p, i) => (
+                    <p key={i} className={i < paragraphs.length - 1 ? "mb-4" : ""}>{p}</p>
+                  ))}
+                </div>
               </div>
-              <div className="article-summary-text">
-                {paragraphs.map((p, i) => (
-                  <p key={i} className={i < paragraphs.length - 1 ? "mb-4" : ""}>{p}</p>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
+
+          {/* Right: AI Chatbot */}
+          <ArticleChat
+            articleTitle={article.title}
+            articleSummary={articleSummary || article.title}
+          />
+        </div>
 
         {/* Go to Project button */}
         <a
