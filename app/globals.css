@@ -2439,7 +2439,25 @@ body.nav-no-scroll {
 }
 
 [data-theme="light"] .vote-compact-btn {
-  color: rgba(0, 0, 0, 0.3);
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .vote-compact-btn:hover:not(.vote-disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .vote-compact-btn.vote-wagmi:hover:not(.vote-disabled),
+[data-theme="light"] .vote-compact-btn.vote-wagmi.vote-active {
+  color: #1a6b3c;
+}
+
+[data-theme="light"] .vote-compact-btn.vote-ngmi:hover:not(.vote-disabled),
+[data-theme="light"] .vote-compact-btn.vote-ngmi.vote-active {
+  color: #8b2020;
+}
+
+[data-theme="light"] .vote-compact-count {
+  color: rgba(0, 0, 0, 0.6);
 }
 
 /* ========================================
