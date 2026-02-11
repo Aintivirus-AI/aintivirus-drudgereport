@@ -110,8 +110,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
         {/* Meta info */}
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mb-8">
-          {article.submitter_username && (
-            <span>Submitted by @{article.submitter_username}</span>
+          {article.submitter_wallet && (
+            <span>Submitted by {article.submitter_wallet.slice(0, 4)}...{article.submitter_wallet.slice(-4)}</span>
           )}
           <span>{publishedDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
           <a

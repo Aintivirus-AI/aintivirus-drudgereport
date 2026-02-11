@@ -73,10 +73,8 @@ export default function LeaderboardPage() {
 
                     {/* Name */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {submitter.telegram_username
-                          ? `@${submitter.telegram_username}`
-                          : `Anon #${index + 1}`}
+                      <p className="font-medium text-sm truncate font-mono">
+                        {submitter.sol_address.slice(0, 4)}...{submitter.sol_address.slice(-4)}
                       </p>
                       <p className="text-xs text-gray-500">
                         {submitter.total_submissions} submitted, {Math.round((submitter.published_count / submitter.total_submissions) * 100)}% hit rate

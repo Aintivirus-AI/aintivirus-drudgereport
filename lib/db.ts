@@ -397,6 +397,7 @@ export function getHeadlineWithDetails(id: number): (Headline & {
   mint_address?: string;
   token_image_url?: string;
   submitter_username?: string;
+  submitter_wallet?: string;
   submission_created_at?: string;
   cached_content?: string;
   summary?: string;
@@ -406,8 +407,8 @@ export function getHeadlineWithDetails(id: number): (Headline & {
       h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
       h.importance_score, h.mcafee_take, h.summary,
       t.ticker, t.pump_url, t.token_name, t.mint_address, t.image_url as token_image_url,
-      s.telegram_username as submitter_username, s.created_at as submission_created_at,
-      s.cached_content
+      s.telegram_username as submitter_username, s.sol_address as submitter_wallet,
+      s.created_at as submission_created_at, s.cached_content
     FROM headlines h
     LEFT JOIN tokens t ON h.token_id = t.id
     LEFT JOIN submissions s ON t.submission_id = s.id
@@ -435,6 +436,7 @@ export function getHeadlineWithDetails(id: number): (Headline & {
     mint_address: row.mint_address || undefined,
     token_image_url: row.token_image_url || undefined,
     submitter_username: row.submitter_username || undefined,
+    submitter_wallet: row.submitter_wallet || undefined,
     submission_created_at: row.submission_created_at || undefined,
     cached_content: row.cached_content || undefined,
     summary: row.summary || undefined,
@@ -782,6 +784,7 @@ export function getRecentSubmissionByUrl(
 export function getTopSubmitters(limit: number = 20): Array<{
   telegram_username: string | null;
   telegram_user_id: string;
+  sol_address: string;
   published_count: number;
   total_submissions: number;
 }> {
@@ -789,6 +792,7 @@ export function getTopSubmitters(limit: number = 20): Array<{
     SELECT 
       telegram_username,
       telegram_user_id,
+      sol_address,
       SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published_count,
       COUNT(*) as total_submissions
     FROM submissions
@@ -800,6 +804,7 @@ export function getTopSubmitters(limit: number = 20): Array<{
   return stmt.all(limit) as Array<{
     telegram_username: string | null;
     telegram_user_id: string;
+    sol_address: string;
     published_count: number;
     total_submissions: number;
   }>;
