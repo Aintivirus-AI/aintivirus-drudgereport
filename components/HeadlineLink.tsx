@@ -98,6 +98,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                     title={headline.title}
                     url={articleUrl}
                     ticker={headline.token?.ticker}
+                    pumpUrl={headline.token?.pump_url}
                   />
                 </div>
               </div>
@@ -168,6 +169,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
               title={headline.title}
               url={articleUrl}
               ticker={headline.token?.ticker}
+              pumpUrl={headline.token?.pump_url}
             />
           </div>
         </div>

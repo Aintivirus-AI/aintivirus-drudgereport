@@ -167,8 +167,9 @@ export async function tweetArticlePublished(opts: {
 }): Promise<{ success: boolean; tweetId?: string; error?: string }> {
   const { headline, ticker, pumpUrl, articleUrl } = opts;
 
-  // Truncate headline to fit within 280 chars with the rest of the tweet
-  const maxHeadlineLen = 180;
+  // Reserve chars for the template around the headline
+  // Ticker + pump link + article link + formatting ≈ 100 chars
+  const maxHeadlineLen = ticker ? 140 : 200;
   const truncatedHeadline =
     headline.length > maxHeadlineLen
       ? headline.substring(0, maxHeadlineLen - 3) + "..."
@@ -178,12 +179,13 @@ export async function tweetArticlePublished(opts: {
 
   if (ticker && pumpUrl) {
     tweetText =
-      `BREAKING: ${truncatedHeadline}\n\n` +
-      `$${ticker} token now LIVE\n\n` +
+      `${truncatedHeadline}\n\n` +
+      `$${ticker} just launched\n\n` +
+      `${pumpUrl}\n\n` +
       `${articleUrl}`;
   } else {
     tweetText =
-      `BREAKING: ${truncatedHeadline}\n\n` +
+      `${truncatedHeadline}\n\n` +
       `${articleUrl}`;
   }
 

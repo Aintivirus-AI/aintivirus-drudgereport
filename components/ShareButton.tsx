@@ -3,12 +3,16 @@
 /**
  * Tiny, subtle share-on-X button that appears on hover next to headlines.
  */
-export function ShareButton({ title, url, ticker }: { title: string; url: string; ticker?: string }) {
-  const tweetText = encodeURIComponent(
-    `${title}${ticker ? ` $${ticker}` : ""}`
-  );
-  const tweetUrl = encodeURIComponent(url);
-  const href = `https://twitter.com/intent/tweet?text=${tweetText}&url=${tweetUrl}`;
+export function ShareButton({ title, url, ticker, pumpUrl }: { title: string; url: string; ticker?: string; pumpUrl?: string }) {
+  const lines = [title];
+  if (ticker && pumpUrl) {
+    lines.push(`\n$${ticker} just launched\n${pumpUrl}`);
+  } else if (ticker) {
+    lines.push(`\n$${ticker}`);
+  }
+  lines.push(`\n${url}`);
+  const tweetText = encodeURIComponent(lines.join(""));
+  const href = `https://twitter.com/intent/tweet?text=${tweetText}`;
 
   return (
     <a

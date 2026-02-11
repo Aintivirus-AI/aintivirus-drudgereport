@@ -60,9 +60,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const articleUrl = `${siteUrl}/article/${article.id}`;
-  const tweetText = encodeURIComponent(
-    `${article.title}${article.token ? ` $${article.token.ticker}` : ""} via @officialmcafee`
-  );
+  const tweetLines = [article.title];
+  if (article.token?.ticker && article.token?.pump_url) {
+    tweetLines.push(`\n$${article.token.ticker} just launched\n${article.token.pump_url}`);
+  } else if (article.token?.ticker) {
+    tweetLines.push(`\n$${article.token.ticker}`);
+  }
+  tweetLines.push(`\n${articleUrl}`);
+  const tweetText = encodeURIComponent(tweetLines.join(""));
   const telegramShareUrl = encodeURIComponent(articleUrl);
 
   const publishedDate = new Date(article.created_at);
