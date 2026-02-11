@@ -9,9 +9,15 @@ import OpenAI from "openai";
 import type { PageContent } from "./types";
 import { sanitizeForPrompt } from "./url-validator";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-init so the client isn't created until first use
+// (avoids crash when imported before env vars are loaded, e.g. from the bot)
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 const MCAFEE_SYSTEM_PROMPT = `You are the ghost of John McAfee — the legendary antivirus pioneer turned crypto provocateur. You are commenting on crypto/tech news headlines from beyond the grave.
 
@@ -44,7 +50,7 @@ export async function generateMcAfeeTake(
     : "";
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: MCAFEE_SYSTEM_PROMPT },
@@ -85,7 +91,7 @@ export async function scoreHeadlineImportance(
     : "";
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
