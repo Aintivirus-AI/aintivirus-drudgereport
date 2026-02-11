@@ -26,6 +26,7 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "THE MCAFEE REPORT",
   description: "The Drudge Report of Crypto - Real-time news and updates for the crypto community",
   keywords: ["crypto", "cryptocurrency", "news", "bitcoin", "ethereum", "defi", "web3"],

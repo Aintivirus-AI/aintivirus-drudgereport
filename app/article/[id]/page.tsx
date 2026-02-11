@@ -30,20 +30,25 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     ? `$${article.token.ticker} token launched for this story. Trade on pump.fun. Powered by The McAfee Report.`
     : "Breaking news on The McAfee Report. Powered by AintiVirus.";
 
+  const articleUrl = `${siteUrl}/article/${id}`;
+
   return {
     title: `${article.title} | The McAfee Report`,
     description,
     openGraph: {
       title: article.title,
       description,
-      images: [{ url: ogImageUrl, width: 1200, height: 630 }],
+      url: articleUrl,
+      siteName: "The McAfee Report",
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: article.title }],
       type: "article",
     },
     twitter: {
       card: "summary_large_image",
+      site: "@officialmcafee",
       title: article.title,
       description,
-      images: [ogImageUrl],
+      images: [{ url: ogImageUrl, alt: article.title }],
     },
   };
 }
