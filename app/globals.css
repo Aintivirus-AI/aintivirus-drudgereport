@@ -2642,6 +2642,18 @@ body.nav-no-scroll {
   pointer-events: auto;
 }
 
+/* Invisible bridge that covers the gap between the headline and the tooltip,
+   so the cursor can travel from the headline into the tooltip without
+   triggering onMouseLeave on the wrapper. */
+.mcafee-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 12px;
+}
+
 .mcafee-tooltip .mcafee-ghost-icon {
   font-size: 16px;
   flex-shrink: 0;
