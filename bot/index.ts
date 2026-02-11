@@ -1195,27 +1195,38 @@ bot.on("message:text", async (ctx) => {
   // Handle /skip for COTD description
   if (text === "/skip" && session.step === "awaiting_cotd_description") {
     try {
-      const response = await apiRequest("/coin-of-the-day", "PUT", {
+      // 1. Create a normal headline (no token will be minted)
+      const headlineRes = await apiRequest("/headlines", "POST", {
         title: session.pendingTitle,
         url: session.pendingUrl,
         image_url: session.includeImage ? session.pendingImageUrl : undefined,
       });
 
-      if (response.ok) {
-        await ctx.reply(
-          `*Coin of the Day updated*\n` +
-          `─────────────────────\n\n` +
-          `Title: ${escapeMarkdown(session.pendingTitle || "")}\n` +
-          `URL: \`${session.pendingUrl || ""}\`\n` +
-          `${session.includeImage ? "Image: included\n" : ""}` +
-          `\n_No pump.fun token created._\n` +
-          `\n${API_URL}`,
-          { parse_mode: "Markdown" }
-        );
-      } else {
-        const error = await response.json();
-        throw new Error(error.error || "Unknown error");
+      if (!headlineRes.ok) {
+        const err = await headlineRes.json();
+        throw new Error(err.error || "Failed to create headline");
       }
+
+      const { headline } = await headlineRes.json();
+      const articleUrl = `/article/${headline.id}`;
+
+      // 2. Update coin_of_the_day pointer to the article page
+      await apiRequest("/coin-of-the-day", "PUT", {
+        title: session.pendingTitle,
+        url: articleUrl,
+        image_url: session.includeImage ? session.pendingImageUrl : undefined,
+      });
+
+      await ctx.reply(
+        `*Coin of the Day published*\n` +
+        `─────────────────────\n\n` +
+        `Title: ${escapeMarkdown(session.pendingTitle || "")}\n` +
+        `Article: \`${API_URL}${articleUrl}\`\n` +
+        `Source: \`${session.pendingUrl || ""}\`\n` +
+        `${session.includeImage ? "Image: included\n" : ""}` +
+        `\n_Published as article — no token created._`,
+        { parse_mode: "Markdown" }
+      );
     } catch (error) {
       console.error("Error setting coin of the day:", error);
       await ctx.reply("Failed to set Coin of the Day. Try again.");
