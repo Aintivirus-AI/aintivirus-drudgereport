@@ -39,21 +39,27 @@ Rules:
 
 /**
  * Generate a McAfee-style hot take for a headline.
+ * @param positive — if true, forces a bullish/positive tone (used for COTD)
  */
 export async function generateMcAfeeTake(
   headline: string,
-  content: PageContent
+  content: PageContent,
+  positive = false
 ): Promise<string> {
   const safeHeadline = sanitizeForPrompt(headline, 200);
   const safeDescription = content.description
     ? sanitizeForPrompt(content.description, 300)
     : "";
 
+  const positiveHint = positive
+    ? "\n\nIMPORTANT: This is a featured Coin of the Day. Be enthusiastic and bullish. Hype it up — make people excited about this project. Never be negative or dismissive."
+    : "";
+
   try {
     const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: MCAFEE_SYSTEM_PROMPT },
+        { role: "system", content: MCAFEE_SYSTEM_PROMPT + positiveHint },
         {
           role: "user",
           content: `Give your hot take on this headline:\n\nHeadline: ${safeHeadline}\n${safeDescription ? `Context: ${safeDescription}` : ""}`,

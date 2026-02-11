@@ -580,8 +580,9 @@ Requirements:
 - Keep titles concise (under 60 characters)
 - Make the project sound interesting and worth checking out
 - Use the project/coin name if identifiable
-- Be hype but not misleading
-- ALL CAPS is acceptable for emphasis
+- Be engaging but not misleading
+- Plain text only — no stars, asterisks, markdown, colons, or special formatting
+- Do NOT include "Coin of the Day" in the title — that prefix is added automatically
 
 Return ONLY the 3 titles, one per line, numbered 1-3. No other text.`;
 
@@ -597,6 +598,8 @@ Return ONLY the 3 titles, one per line, numbered 1-3. No other text.`;
     const lines = response.split("\n").filter(line => line.trim());
     const headlines = lines
       .map(line => line.replace(/^\d+[\.\)]\s*/, "").trim())
+      // Strip markdown bold, stars, quotes, and leading/trailing special chars
+      .map(h => h.replace(/\*+/g, "").replace(/^["']+|["']+$/g, "").trim())
       .filter(h => h.length > 0)
       .slice(0, 3);
 
@@ -1247,7 +1250,7 @@ bot.on("message:text", async (ctx) => {
 
       Promise.all([
         scoreHeadlineImportance(cotdTitle, pageContent),
-        generateMcAfeeTake(cotdTitle, pageContent),
+        generateMcAfeeTake(cotdTitle, pageContent, true),
         generateCoinSummary(cotdTitle, pageContent),
       ]).then(([importanceScore, mcafeeTake, summary]) => {
         updateHeadlineImportanceScore(headlineId, importanceScore);
@@ -1628,7 +1631,7 @@ bot.on("message:text", async (ctx) => {
 
         Promise.all([
           scoreHeadlineImportance(cotdTitle, pageContent),
-          generateMcAfeeTake(cotdTitle, pageContent),
+          generateMcAfeeTake(cotdTitle, pageContent, true),
           generateCoinSummary(cotdTitle, pageContent),
         ]).then(([importanceScore, mcafeeTake, summary]) => {
           updateHeadlineImportanceScore(headlineId, importanceScore);
