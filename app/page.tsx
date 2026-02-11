@@ -33,9 +33,9 @@ export default function Home() {
         {/* Page Title */}
         <div className="border-b border-dark-200/30 py-4">
           <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between">
-              <div className="w-10" /> {/* Spacer for centering */}
-              <div className="text-center">
+            <div className="flex items-start justify-between">
+              <div className="w-10 flex-shrink-0" /> {/* Spacer for centering */}
+              <div className="text-center min-w-0 flex-1">
                 <h1 className="text-2xl md:text-3xl font-bold tracking-wider">
                   <span className="text-neon-cyan">THE MCAFEE REPORT</span>
                 </h1>
@@ -52,7 +52,9 @@ export default function Home() {
                 </p>
                 <TokenTicker />
               </div>
-              <ThemeToggle />
+              <div className="flex-shrink-0 mt-1">
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </div>
