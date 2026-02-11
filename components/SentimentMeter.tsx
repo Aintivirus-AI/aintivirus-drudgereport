@@ -23,20 +23,26 @@ function hasUserVoted(): boolean {
   return false;
 }
 
-export function SentimentMeter() {
+interface SentimentMeterProps {
+  /** When true, always show the meter (skip the "user must vote first" gate). */
+  alwaysShow?: boolean;
+}
+
+export function SentimentMeter({ alwaysShow = false }: SentimentMeterProps) {
   const [sentiment, setSentiment] = useState<SentimentData | null>(null);
-  const [userHasVoted, setUserHasVoted] = useState(false);
+  const [userHasVoted, setUserHasVoted] = useState(alwaysShow);
 
   // Check localStorage on mount + listen for new votes
   useEffect(() => {
+    if (alwaysShow) return;
     setUserHasVoted(hasUserVoted());
 
     const onVoteCast = () => setUserHasVoted(true);
     window.addEventListener("voteCast", onVoteCast);
     return () => window.removeEventListener("voteCast", onVoteCast);
-  }, []);
+  }, [alwaysShow]);
 
-  // Only fetch sentiment data once we know the user has voted
+  // Only fetch sentiment data once we know the user has voted (or alwaysShow)
   useEffect(() => {
     if (!userHasVoted) return;
 

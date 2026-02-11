@@ -116,10 +116,10 @@ export function SubmitCTA() {
               </svg>
             </a>
             <a
-              href="/leaderboard"
+              href="/analytics"
               className="submit-cta-button-secondary"
             >
-              View Leaderboard
+              View Analytics
             </a>
           </div>
 

@@ -1,13 +1,12 @@
 import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
-import { CoinOfTheDay } from "@/components/CoinOfTheDay";
 import { TokenTicker } from "@/components/TokenTicker";
 import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
 import { SentimentMeter } from "@/components/SentimentMeter";
 import { WarRoomFeed } from "@/components/WarRoomFeed";
-import { getHeadlines, getMainHeadline, getCoinOfTheDay, getBreakingHeadline } from "@/lib/db";
+import { getHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -16,7 +15,6 @@ export default function Home() {
   const leftHeadlines = getHeadlines("left", 15);
   const rightHeadlines = getHeadlines("right", 15);
   const mainHeadline = getMainHeadline();
-  const coinOfTheDay = getCoinOfTheDay();
   const breakingHeadline = getBreakingHeadline(2, 80);
   
   // Derive HOT TOPICS from already-fetched headlines (no duplicate queries)
@@ -60,7 +58,7 @@ export default function Home() {
         </div>
 
         {/* Top coins scrolling ribbon */}
-        <TopCoinsRibbon />
+        {/* <TopCoinsRibbon /> */}
 
         {/* Community Sentiment Meter */}
         <SentimentMeter />
@@ -111,12 +109,7 @@ export default function Home() {
             <hr className="border-t-2 border-neon-cyan/50" />
           </div>
 
-          {/* Mobile: Coin of the Day */}
-          <div className="lg:hidden mb-6">
-            <CoinOfTheDay coin={coinOfTheDay} />
-          </div>
-
-          {/* Mobile: Columns after */}
+          {/* Mobile: Columns */}
           <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-8">
             <HeadlineColumn headlines={leftHeadlines} />
             <HeadlineColumn headlines={rightHeadlines} />
@@ -167,22 +160,12 @@ export default function Home() {
 
             {/* Right Column */}
             <div className="lg:col-span-1">
-              <CoinOfTheDay coin={coinOfTheDay} />
               <HeadlineColumn headlines={rightHeadlines} />
             </div>
           </div>
         </div>
 
-        {/* War Room - Live Activity Feed */}
-        <div className="container mx-auto px-4 pt-4 pb-6 max-w-3xl">
-          <div className="warroom-section">
-            <div className="warroom-section-header">
-              <span className="warroom-section-dot" />
-              <span className="warroom-section-title">LIVE ACTIVITY</span>
-            </div>
-            <WarRoomFeed />
-          </div>
-        </div>
+        {/* Live Activity Feed moved to /analytics */}
       </div>
     </main>
   );

@@ -1288,6 +1288,26 @@ body.nav-no-scroll {
   to { background-position: 200% center; }
 }
 
+.token-ticker-link--cotd {
+  background: linear-gradient(
+    90deg,
+    #fbbf24, #f59e0b, #fde68a, #f59e0b, #fbbf24
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: ticker-gold-shimmer 2.5s linear infinite;
+}
+
+.token-ticker-link--cotd svg {
+  stroke: #fbbf24;
+}
+
+.token-ticker-link--cotd:hover {
+  animation-duration: 1s;
+}
+
 /* Light mode ticker links */
 :root[data-theme="light"] .token-ticker-divider {
   background: rgba(0, 0, 0, 0.15);
