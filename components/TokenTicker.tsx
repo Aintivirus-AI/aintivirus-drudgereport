@@ -32,7 +32,7 @@ export function TokenTicker() {
 
   return (
     <div className="token-ticker">
-      {/* $NEWS address pill */}
+      {/* $NEWS address pill with quick links */}
       <div className="token-ticker-inner">
         <a
           href={PUMP_URL}
@@ -66,22 +66,22 @@ export function TokenTicker() {
             </svg>
           )}
         </button>
-      </div>
 
-      {/* Quick links row */}
-      <div className="token-ticker-links">
-        <a href="/leaderboard" className="token-ticker-link token-ticker-link--gold">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+        <span className="token-ticker-divider" />
+
+        <a href="/leaderboard" className="token-ticker-link token-ticker-link--gold" title="Leaderboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
             <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Leaderboard
         </a>
-        <span className="token-ticker-links-dot">·</span>
+
+        <span className="token-ticker-divider" />
+
         <button
           onClick={() => setEarnOpen(true)}
           className="token-ticker-link token-ticker-link--rainbow"
         >
-          Earn Now
+          Earn
         </button>
       </div>
 

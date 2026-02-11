@@ -51,6 +51,7 @@ export function VoteButtons({ headlineId, compact = false }: VoteButtonsProps) {
       voted: voteType,
     }));
     localStorage.setItem(`vote_${headlineId}`, voteType);
+    window.dispatchEvent(new CustomEvent("voteCast"));
 
     try {
       const res = await fetch("/api/votes", {

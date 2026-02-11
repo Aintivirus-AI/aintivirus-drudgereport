@@ -8,10 +8,38 @@ interface SentimentData {
   ratio: number;
 }
 
+/** Check if the user has cast at least one vote (stored in localStorage). */
+function hasUserVoted(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("vote_")) {
+        return true;
+      }
+    }
+  } catch {
+    // localStorage unavailable (SSR / private browsing)
+  }
+  return false;
+}
+
 export function SentimentMeter() {
   const [sentiment, setSentiment] = useState<SentimentData | null>(null);
+  const [userHasVoted, setUserHasVoted] = useState(false);
 
+  // Check localStorage on mount + listen for new votes
   useEffect(() => {
+    setUserHasVoted(hasUserVoted());
+
+    const onVoteCast = () => setUserHasVoted(true);
+    window.addEventListener("voteCast", onVoteCast);
+    return () => window.removeEventListener("voteCast", onVoteCast);
+  }, []);
+
+  // Only fetch sentiment data once we know the user has voted
+  useEffect(() => {
+    if (!userHasVoted) return;
+
     const fetchSentiment = () => {
       fetch("/api/votes?aggregate=true")
         .then(res => res.json())
@@ -22,9 +50,9 @@ export function SentimentMeter() {
     fetchSentiment();
     const interval = setInterval(fetchSentiment, 30000); // Poll every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [userHasVoted]);
 
-  if (!sentiment || (sentiment.wagmi === 0 && sentiment.ngmi === 0)) {
+  if (!userHasVoted || !sentiment || (sentiment.wagmi === 0 && sentiment.ngmi === 0)) {
     return null;
   }
 
