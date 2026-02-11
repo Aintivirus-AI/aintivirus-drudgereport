@@ -48,7 +48,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
             <div className="flex flex-col gap-1 flex-1 min-w-0">
               {/* Row 1: Headline text */}
               {headline.mcafee_take ? (
-                <McAfeeTooltip take={headline.mcafee_take}>
+                <McAfeeTooltip take={headline.mcafee_take} articleUrl={articlePath}>
                   <a
                     href={headline.url}
                     target="_blank"
@@ -117,7 +117,7 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
       <div className="flex flex-col gap-1">
         {/* Row 1: Headline text */}
         {headline.mcafee_take ? (
-          <McAfeeTooltip take={headline.mcafee_take}>
+          <McAfeeTooltip take={headline.mcafee_take} articleUrl={articlePath}>
             <a
               href={headline.url}
               target="_blank"

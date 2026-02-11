@@ -66,13 +66,15 @@ export function McAfeeCommentary({ take, compact = false }: McAfeeCommentaryProp
 
 /**
  * Tooltip wrapper for McAfee takes on headline links.
+ * Optionally shows a "Dive Deeper" link to the article page.
  */
 interface McAfeeTooltipProps {
   take: string;
+  articleUrl?: string;
   children: React.ReactNode;
 }
 
-export function McAfeeTooltip({ take, children }: McAfeeTooltipProps) {
+export function McAfeeTooltip({ take, articleUrl, children }: McAfeeTooltipProps) {
   const [show, setShow] = useState(false);
 
   return (
@@ -85,7 +87,17 @@ export function McAfeeTooltip({ take, children }: McAfeeTooltipProps) {
       {show && (
         <div className="mcafee-tooltip">
           <GhostIcon size={18} />
-          <span className="mcafee-tooltip-text">{take}</span>
+          <div className="mcafee-tooltip-body">
+            <span className="mcafee-tooltip-text">{take}</span>
+            {articleUrl && (
+              <a href={articleUrl} className="mcafee-tooltip-dive" onClick={(e) => e.stopPropagation()}>
+                Dive Deeper
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mcafee-tooltip-dive-icon">
+                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
+            )}
+          </div>
         </div>
       )}
     </div>

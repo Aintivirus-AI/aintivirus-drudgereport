@@ -7,11 +7,17 @@ import {
 } from "@/lib/scheduler";
 import { isAuthenticated } from "@/lib/auth";
 
+// Debounce: track last validation trigger time to prevent rapid-fire calls.
+// If multiple users submit within 30 seconds, only the first triggers
+// immediate validation — the rest are batched in that same cycle.
+const DEBOUNCE_MS = 30_000;
+let lastValidateTriggerMs = 0;
+
 /**
  * POST /api/scheduler/trigger
  *
- * Manually trigger a scheduler action. Useful for testing so you don't
- * have to wait for the 20-minute cron interval.
+ * Trigger a scheduler action. Called automatically by the bot on each
+ * submission (event-driven) and can also be triggered manually.
  *
  * Query params / JSON body:
  *   action: "cycle" (default) | "validate" | "publish" | "status"
@@ -43,7 +49,24 @@ export async function POST(request: NextRequest) {
   try {
     switch (action) {
       case "validate": {
-        console.log("[API] Manual trigger: validate");
+        // Debounce: skip if triggered recently (another cycle is already running)
+        const now = Date.now();
+        if (now - lastValidateTriggerMs < DEBOUNCE_MS) {
+          console.log(
+            `[API] Validate trigger debounced (${Math.round((now - lastValidateTriggerMs) / 1000)}s since last)`
+          );
+          const status = getSchedulerStatus();
+          return NextResponse.json({
+            success: true,
+            action: "validate",
+            message: "Validation already triggered recently, will be processed in current cycle",
+            debounced: true,
+            status,
+          });
+        }
+
+        lastValidateTriggerMs = now;
+        console.log("[API] Trigger: validate");
         await processValidationQueue();
         const status = getSchedulerStatus();
         return NextResponse.json({

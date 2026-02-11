@@ -24,7 +24,7 @@ import {
 import { validateSubmission, smartFetchContent } from "./ai-validator";
 import { generateTokenMetadata } from "./token-generator";
 import { deployToken } from "./pump-deployer";
-import { notifySubmitterPublished } from "./telegram-notifier";
+import { notifySubmitterPublished, notifySubmitterApproved, notifySubmitterRejected } from "./telegram-notifier";
 import { tweetArticlePublished, isTwitterConfigured } from "./twitter-poster";
 import { generateMcAfeeTake, scoreHeadlineImportance } from "./mcafee-commentator";
 import { ActivityLog } from "./activity-logger";
@@ -118,6 +118,15 @@ export async function processValidationQueue(): Promise<number> {
         console.log(
           `[Scheduler] Approved #${submission.id} (fact: ${result.factScore}, fresh: ${result.freshnessHours}h)`
         );
+
+        // Notify the submitter immediately — fire-and-forget
+        notifySubmitterApproved({
+          telegramUserId: submission.telegram_user_id,
+          submissionId: submission.id,
+          title: content.title || "Untitled",
+        }).catch((err) =>
+          console.warn(`[Scheduler] Failed to send approval notification:`, err)
+        );
       } else {
         updateSubmissionStatus(
           submission.id,
@@ -127,6 +136,16 @@ export async function processValidationQueue(): Promise<number> {
         ActivityLog.rejected(submission.id, result.rejectionReason || "Unknown reason");
         console.log(
           `[Scheduler] Rejected #${submission.id}: ${result.rejectionReason}`
+        );
+
+        // Notify the submitter about the rejection — fire-and-forget
+        notifySubmitterRejected({
+          telegramUserId: submission.telegram_user_id,
+          submissionId: submission.id,
+          url: submission.url,
+          rejectionReason: result.rejectionReason || "Unknown reason",
+        }).catch((err) =>
+          console.warn(`[Scheduler] Failed to send rejection notification:`, err)
         );
       }
 
@@ -141,6 +160,17 @@ export async function processValidationQueue(): Promise<number> {
         "rejected",
         "Validation error – please try again"
       );
+
+      // Notify about the technical error — fire-and-forget
+      notifySubmitterRejected({
+        telegramUserId: submission.telegram_user_id,
+        submissionId: submission.id,
+        url: submission.url,
+        rejectionReason: "Validation error – please try again with /submit",
+      }).catch((err) =>
+        console.warn(`[Scheduler] Failed to send error notification:`, err)
+      );
+
       validated++;
     }
   }
@@ -470,16 +500,20 @@ export function getSchedulerStatus(): {
  * Determine the optimal interval (in ms) until the next cycle
  * based on current queue depth.
  *
- *   queueDepth > 10  →   5 minutes (sprint mode)
- *   queueDepth > 0   →  10 minutes (active)
- *   queueDepth == 0  →  20 minutes (idle)
+ * These intervals are a safety net — the primary trigger is now
+ * event-driven (bot fires HTTP POST on each submission). The timer
+ * catches anything that slips through.
+ *
+ *   queueDepth > 10  →   2 minutes (sprint mode)
+ *   queueDepth > 0   →   5 minutes (active)
+ *   queueDepth == 0  →  10 minutes (idle)
  */
 export function getNextIntervalMs(): number {
   const { queueDepth } = getSchedulerStatus();
 
-  if (queueDepth > 10) return 5 * 60 * 1000;   //  5 min
-  if (queueDepth > 0)  return 10 * 60 * 1000;   // 10 min
-  return 20 * 60 * 1000;                         // 20 min
+  if (queueDepth > 10) return 2 * 60 * 1000;   //  2 min
+  if (queueDepth > 0)  return 5 * 60 * 1000;    //  5 min
+  return 10 * 60 * 1000;                         // 10 min
 }
 
 /**

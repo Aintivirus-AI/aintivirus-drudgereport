@@ -108,10 +108,26 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </div>
         )}
 
-        {/* Headline */}
-        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-red-500 leading-tight mb-4">
-          {article.title}
-        </h1>
+        {/* Headline — clickable link to source for regular articles */}
+        {article.title.startsWith("Coin Of The Day:") ? (
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-red-500 leading-tight mb-4">
+            {article.title}
+          </h1>
+        ) : (
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block group"
+          >
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-red-500 leading-tight mb-4 group-hover:underline decoration-red-500/50 underline-offset-4 transition-all">
+              {article.title}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline-block w-6 h-6 md:w-8 md:h-8 ml-2 opacity-40 group-hover:opacity-100 transition-opacity align-baseline">
+                <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </h1>
+          </a>
+        )}
 
         {/* AI McAfee Commentary */}
         {article.mcafee_take && (
@@ -175,18 +191,20 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           />
         </div>
 
-        {/* Go to Project button */}
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-6 py-3 mb-8 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 hover:bg-neon-cyan/20 hover:border-neon-cyan/50 transition-all text-neon-cyan font-semibold text-sm"
-        >
-          Go to Project
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-            <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </a>
+        {/* Go to Project button — only for Coin of the Day articles */}
+        {article.title.startsWith("Coin Of The Day:") && (
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 mb-8 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 hover:bg-neon-cyan/20 hover:border-neon-cyan/50 transition-all text-neon-cyan font-semibold text-sm"
+          >
+            Go to Project
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+              <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </a>
+        )}
 
         {/* Token Section */}
         {article.token && (
@@ -227,7 +245,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
             {/* DexScreener live chart */}
             {article.mint_address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(article.mint_address) && (
-              <div className="mt-6 rounded-lg overflow-hidden border border-dark-200/30">
+              <div className="dexscreener-embed mt-6 rounded-lg overflow-hidden border border-dark-200/30">
                 <iframe
                   src={`https://dexscreener.com/solana/${article.mint_address}?embed=1&theme=dark&info=0&chartLeftToolbar=0&chartTheme=dark`}
                   className="w-full border-0"
@@ -240,7 +258,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   href={`https://dexscreener.com/solana/${article.mint_address}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 bg-black/40 hover:bg-black/60 transition-colors text-sm text-gray-400 hover:text-white"
+                  className="dexscreener-link flex items-center justify-center gap-2 py-2.5 bg-black/40 hover:bg-black/60 transition-colors text-sm text-gray-400 hover:text-white"
                 >
                   Open full chart on DexScreener
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
@@ -257,7 +275,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         )}
 
         {/* Social Share */}
-        <div className="flex flex-wrap gap-3 mb-8">
+        <div className="flex flex-wrap justify-center gap-3 mb-8">
           <a
             href={`https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(articleUrl)}`}
             target="_blank"

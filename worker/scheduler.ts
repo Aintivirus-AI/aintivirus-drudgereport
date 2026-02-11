@@ -1,11 +1,11 @@
 /**
  * Scheduler worker process.
  *
- * Dynamic scheduling:
+ * Dynamic scheduling (safety-net timer — primary trigger is event-driven):
  * - Adjusts interval based on queue depth:
- *     > 10 items →  5 min (sprint mode)
- *     > 0  items → 10 min (active)
- *     0 items    → 20 min (idle)
+ *     > 10 items →  2 min (sprint mode)
+ *     > 0  items →  5 min (active)
+ *     0 items    → 10 min (idle)
  * - Revenue processing runs on a fixed 5-minute cron (independent)
  *
  * Other features:
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
   cronTasks.push(revenueTask);
 
   console.log("⏰ Scheduler started:");
-  console.log("   - Publishing:  dynamic interval (5/10/20 min based on queue depth)");
+  console.log("   - Publishing:  event-driven + safety-net timer (2/5/10 min based on queue depth)");
   console.log("   - Revenue:     every 5 minutes");
   console.log("   Press Ctrl+C to stop\n");
 

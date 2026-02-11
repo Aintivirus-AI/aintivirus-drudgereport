@@ -1,5 +1,6 @@
 /**
- * Sends Telegram DM notifications to users when their submissions are published.
+ * Sends Telegram DM notifications to users for all submission outcomes:
+ * approved, rejected, and published.
  * Runs within the scheduler worker process (which already has env vars loaded).
  */
 
@@ -104,6 +105,69 @@ export async function notifySubmitterPublished(opts: {
   if (sent) {
     console.log(
       `[TelegramNotifier] Notified user ${telegramUserId} about submission #${submissionId}`
+    );
+  }
+}
+
+/**
+ * Notify a submitter that their article has been approved and is in the
+ * publishing queue. Gives immediate positive feedback before the full
+ * publish cycle (token deployment, etc.) completes.
+ */
+export async function notifySubmitterApproved(opts: {
+  telegramUserId: string;
+  submissionId: number;
+  title: string;
+}): Promise<void> {
+  const { telegramUserId, submissionId, title } = opts;
+
+  const safeTitle = escapeTelegramMarkdown(title || "your article");
+
+  const message =
+    `*Submission Approved* ✅\n` +
+    `─────────────────────\n\n` +
+    `${safeTitle}\n\n` +
+    `Your submission has been approved and is now in the publishing queue\\.\n` +
+    `You'll receive another notification once it's live with a token launch\\.\n\n` +
+    `_Submission \\#${submissionId}_`;
+
+  const sent = await sendTelegramMessage(telegramUserId, message);
+  if (sent) {
+    console.log(
+      `[TelegramNotifier] Notified user ${telegramUserId} — approved #${submissionId}`
+    );
+  }
+}
+
+/**
+ * Notify a submitter that their article has been rejected, with the reason.
+ * Encourages them to try again with a different submission.
+ */
+export async function notifySubmitterRejected(opts: {
+  telegramUserId: string;
+  submissionId: number;
+  url: string;
+  rejectionReason: string;
+}): Promise<void> {
+  const { telegramUserId, submissionId, url, rejectionReason } = opts;
+
+  const safeUrl = escapeTelegramMarkdown(
+    url.length > 50 ? url.substring(0, 47) + "..." : url
+  );
+  const safeReason = escapeTelegramMarkdown(rejectionReason || "Unknown reason");
+
+  const message =
+    `*Submission Not Approved* ❌\n` +
+    `─────────────────────\n\n` +
+    `URL: \`${safeUrl}\`\n` +
+    `Reason: ${safeReason}\n\n` +
+    `Don't worry — you can submit another link with /submit\\.\n\n` +
+    `_Submission \\#${submissionId}_`;
+
+  const sent = await sendTelegramMessage(telegramUserId, message);
+  if (sent) {
+    console.log(
+      `[TelegramNotifier] Notified user ${telegramUserId} — rejected #${submissionId}`
     );
   }
 }

@@ -260,6 +260,23 @@ body {
   border-color: rgba(26, 86, 219, 0.15);
 }
 
+/* DexScreener embed in light mode — the iframe content is always dark-themed,
+   so we hide the border to avoid a harsh grey outline against the light page. */
+[data-theme="light"] .main-content .dexscreener-embed {
+  border-color: transparent;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .main-content .dexscreener-link {
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(26, 26, 46, 0.6);
+}
+
+[data-theme="light"] .main-content .dexscreener-link:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1a1a2e;
+}
+
 [data-theme="light"] .main-content .text-neon-green {
   color: #2d6a4f;
 }
@@ -2622,12 +2639,19 @@ body.nav-no-scroll {
   max-width: 320px;
   width: max-content;
   animation: mcafee-fade-in 0.2s ease-out;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .mcafee-tooltip .mcafee-ghost-icon {
   font-size: 16px;
   flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.mcafee-tooltip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .mcafee-tooltip-text {
@@ -2635,6 +2659,28 @@ body.nav-no-scroll {
   color: rgba(216, 180, 254, 0.95);
   font-style: italic;
   line-height: 1.5;
+}
+
+.mcafee-tooltip-dive {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  color: rgba(216, 180, 254, 0.6);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  align-self: flex-end;
+}
+
+.mcafee-tooltip-dive:hover {
+  color: rgba(216, 180, 254, 1);
+}
+
+.mcafee-tooltip-dive-icon {
+  width: 12px;
+  height: 12px;
 }
 
 /* Light mode */
@@ -2650,6 +2696,14 @@ body.nav-no-scroll {
 
 [data-theme="light"] .mcafee-attribution {
   color: #4a6274;
+}
+
+[data-theme="light"] .mcafee-tooltip-dive {
+  color: rgba(74, 98, 116, 0.6);
+}
+
+[data-theme="light"] .mcafee-tooltip-dive:hover {
+  color: rgba(74, 98, 116, 1);
 }
 
 /* ========================================

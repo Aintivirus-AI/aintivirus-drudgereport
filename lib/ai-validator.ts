@@ -5,7 +5,7 @@
  * - All AI prompts use system/user message separation to resist prompt injection
  * - User-supplied content is sanitized and truncated before prompt insertion
  * - SHA-256 for duplicate hashing (replaces weak djb2)
- * - Freshness check defaults to "too old" when date is unknown
+ * - Freshness check uses AI-assisted estimation when date is unknown
  * - All HTTP fetches use safeFetchText (SSRF protection + timeout + size limit)
  */
 
@@ -28,10 +28,11 @@ const openai = new OpenAI({
 const DUPLICATE_THRESHOLD_CERTAIN = 0.82; // Auto-duplicate, no AI needed
 const DUPLICATE_THRESHOLD_MAYBE = 0.65; // "Maybe" zone — ask AI to confirm
 
-// Maximum age in hours for "breaking" news
-// Configurable via env var; default 6h is reasonable for syndicated news
+// Maximum age in hours for news submissions
+// Configurable via env var; default 24h covers syndicated news, time-zone
+// differences, and ongoing/developing stories that are still very much current.
 const MAX_NEWS_AGE_HOURS = parseInt(
-  process.env.MAX_NEWS_AGE_HOURS || "6",
+  process.env.MAX_NEWS_AGE_HOURS || "24",
   10
 );
 
@@ -318,14 +319,18 @@ If you truly cannot determine ANY date, respond with:
     return { hours: 0 };
   }
 
-  // For non-social-media URLs, default to OVER the threshold.
-  // This forces the content to be rejected or manually reviewed rather than
-  // silently passing. An attacker could craft a page with no date metadata
-  // to bypass freshness checks for old news.
+  // For non-social-media URLs where no date could be determined:
+  // Default to 75% of the threshold instead of auto-rejecting.
+  // This lets the article pass the freshness check while remaining close
+  // enough to the threshold that genuinely old content (caught by AI fact
+  // check or duplicate detection) still gets filtered. Many legitimate
+  // news sites (smaller outlets, blogs, Substack) simply don't expose
+  // structured date metadata, and auto-rejecting them creates false negatives.
+  const borderlineHours = Math.round(MAX_NEWS_AGE_HOURS * 0.75);
   console.warn(
-    `[Freshness] Could not determine date for ${url} — defaulting to ${MAX_NEWS_AGE_HOURS + 1}h (precautionary rejection)`
+    `[Freshness] Could not determine date for ${url} — defaulting to ${borderlineHours}h (borderline pass, other checks will filter if needed)`
   );
-  return { hours: MAX_NEWS_AGE_HOURS + 1 };
+  return { hours: borderlineHours };
 }
 
 /**
@@ -773,6 +778,25 @@ function extractContentFromHtml(html: string): PageContent {
   if (ldPublishedAt && !isNaN(ldPublishedAt.getTime())) {
     if (!publishedAt || ldPublishedAt > publishedAt) {
       publishedAt = ldPublishedAt;
+    }
+  }
+
+  // --- Strategy 2b: <time datetime="..."> tags ---
+  // Many sites (blogs, Substack, smaller outlets) use semantic <time> elements
+  // instead of meta tags or JSON-LD. Extract the most recent valid datetime.
+  if (!publishedAt) {
+    const timeTags = html.matchAll(/<time[^>]*datetime=["']([^"']+)["'][^>]*>/gi);
+    for (const match of timeTags) {
+      const candidate = new Date(match[1]);
+      if (!isNaN(candidate.getTime())) {
+        const hoursAgo = (Date.now() - candidate.getTime()) / (1000 * 60 * 60);
+        // Sanity: only accept dates within a reasonable range
+        if (hoursAgo >= -1 && hoursAgo <= 720) {
+          if (!publishedAt || candidate > publishedAt) {
+            publishedAt = candidate;
+          }
+        }
+      }
     }
   }
 

@@ -878,7 +878,7 @@ bot.command("submit", async (ctx) => {
     `5. You receive 50% of creator fees\n\n` +
     `*Rules:*\n` +
     `- Must be real, verifiable news\n` +
-    `- Must be recent (under 2 hours old)\n` +
+    `- Must be recent (under 24 hours old)\n` +
     `- No duplicates\n\n` +
     `Queue: ${pendingCount} pending\n\n` +
     `Send the URL:`,
@@ -1158,14 +1158,13 @@ bot.on("message:text", async (ctx) => {
         `─────────────────────\n\n` +
         `ID: \`#${submission.id}\`\n` +
         `URL: \`${session.pendingUrl!.substring(0, 40)}...\`\n` +
-        `Wallet: \`${walletShort}\`\n` +
-        `Queue position: ~${pendingCount}\n\n` +
-        `*Next steps:*\n` +
-        `1. AI reviews your submission\n` +
-        `2. If approved, enters publishing queue\n` +
-        `3. On publish, a token launches\n` +
-        `4. You receive 50% of creator fees\n\n` +
-        `Use /mystatus to check progress.`,
+        `Wallet: \`${walletShort}\`\n\n` +
+        `AI is reviewing your submission now\\.\n` +
+        `You'll be notified here when it's approved or rejected\\.\n\n` +
+        `*If approved:*\n` +
+        `1. A token launches on pump\\.fun\n` +
+        `2. You receive 50% of creator fees\n\n` +
+        `Use /mystatus to check all your submissions\\.`,
         { parse_mode: "Markdown" }
       );
 
@@ -1184,6 +1183,18 @@ bot.on("message:text", async (ctx) => {
         } catch {
           // Admin might have blocked the bot
         }
+      }
+
+      // Trigger immediate validation — fire-and-forget.
+      // The API endpoint has its own debounce (30s) so rapid submissions
+      // are coalesced into a single validation cycle.
+      if (API_SECRET) {
+        fetch(`${API_URL}/api/scheduler/trigger?action=validate`, {
+          method: "POST",
+          headers: { "x-api-key": API_SECRET },
+        }).catch((err) =>
+          console.warn("[Bot] Failed to trigger validation:", err)
+        );
       }
     } catch (error) {
       console.error("Error creating submission:", error);

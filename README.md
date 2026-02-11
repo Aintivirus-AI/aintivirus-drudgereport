@@ -70,7 +70,7 @@ Optional for token deployment:
 | `MASTER_WALLET_PRIVATE_KEY` | Solana wallet private key (base58) |
 | `SOLANA_RPC_URL` | Solana RPC endpoint |
 | `NEWS_TOKEN_MINT` | $NEWS token mint address (for buy-and-burn) |
-| `MAX_NEWS_AGE_HOURS` | Max story age for acceptance (default: 6) |
+| `MAX_NEWS_AGE_HOURS` | Max story age for acceptance (default: 24) |
 | `HELIUS_API_KEY` | Helius API key for enhanced RPC |
 | `HELIUS_WEBHOOK_SECRET` | Helius webhook auth secret |
 | `TWITTER_API_KEY` | Twitter API credentials (4 keys) |
