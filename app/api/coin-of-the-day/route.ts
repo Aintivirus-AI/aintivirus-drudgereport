@@ -51,9 +51,11 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (body.url.length > 2048 || !isSafeUrlProtocol(body.url)) {
+    // Allow relative paths (e.g. /article/123) and absolute URLs
+    const isRelativePath = body.url.startsWith("/");
+    if (body.url.length > 2048 || (!isRelativePath && !isSafeUrlProtocol(body.url))) {
       return NextResponse.json(
-        { error: "Invalid URL (must be http/https, max 2048 chars)" },
+        { error: "Invalid URL (must be http/https or a relative path, max 2048 chars)" },
         { status: 400 }
       );
     }

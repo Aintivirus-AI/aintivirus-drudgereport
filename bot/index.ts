@@ -1201,6 +1201,18 @@ bot.on("message:text", async (ctx) => {
     try {
       const cotdTitle = `Coin Of The Day: ${session.pendingTitle}`;
 
+      // 0. Delete the previous COTD article if one exists
+      try {
+        const prevCotd = await apiRequest("/coin-of-the-day", "GET");
+        if (prevCotd.ok) {
+          const { coinOfTheDay } = await prevCotd.json();
+          const oldMatch = coinOfTheDay?.url?.match(/^\/article\/(\d+)$/);
+          if (oldMatch) {
+            await apiRequest(`/headlines?id=${oldMatch[1]}`, "DELETE");
+          }
+        }
+      } catch { /* non-fatal */ }
+
       // 1. Create a normal headline (no token will be minted)
       const headlineRes = await apiRequest("/headlines", "POST", {
         title: cotdTitle,
@@ -1567,6 +1579,18 @@ bot.on("message:text", async (ctx) => {
       const cotdTitle = `Coin Of The Day: ${session.pendingTitle}`;
 
       try {
+        // 0. Delete the previous COTD article if one exists
+        try {
+          const prevCotd = await apiRequest("/coin-of-the-day", "GET");
+          if (prevCotd.ok) {
+            const { coinOfTheDay } = await prevCotd.json();
+            const oldMatch = coinOfTheDay?.url?.match(/^\/article\/(\d+)$/);
+            if (oldMatch) {
+              await apiRequest(`/headlines?id=${oldMatch[1]}`, "DELETE");
+            }
+          }
+        } catch { /* non-fatal */ }
+
         // 1. Create a normal headline (no token will be minted)
         const headlineRes = await apiRequest("/headlines", "POST", {
           title: cotdTitle,
