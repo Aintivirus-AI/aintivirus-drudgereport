@@ -255,6 +255,45 @@ export function getHeadlines(
 }
 
 /**
+ * Get all sidebar headlines (left + right) in a single sorted list.
+ * Used to distribute headlines evenly across both columns at display time.
+ */
+export function getSidebarHeadlines(limit: number = 72): Headline[] {
+  const stmt = db.prepare(`
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
+      t.ticker, t.pump_url, t.image_url as token_image_url,
+      COALESCE(SUM(CASE WHEN v.vote_type = 'wagmi' THEN 1 ELSE 0 END), 0) as wagmi_count
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    LEFT JOIN votes v ON v.headline_id = h.id
+    WHERE h.column IN ('left', 'right')
+    GROUP BY h.id
+    ORDER BY wagmi_count DESC, h.created_at DESC
+    LIMIT ?
+  `);
+  const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
+  
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
+    } : undefined
+  }));
+}
+
+/**
  * Get all headlines across all columns
  * Includes token data if available
  */

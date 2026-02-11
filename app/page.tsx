@@ -3,14 +3,16 @@ import { HeadlineColumn } from "@/components/HeadlineColumn";
 import { TokenTicker } from "@/components/TokenTicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
-import { getHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
+import { getSidebarHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
 
 export default function Home() {
-  const leftHeadlines = getHeadlines("left", 36);
-  const rightHeadlines = getHeadlines("right", 36);
+  // Fetch all sidebar headlines in one sorted list, then distribute evenly
+  const allSidebarHeadlines = getSidebarHeadlines(72);
+  const leftHeadlines = allSidebarHeadlines.filter((_, i) => i % 2 === 0);
+  const rightHeadlines = allSidebarHeadlines.filter((_, i) => i % 2 === 1);
   const mainHeadline = getMainHeadline();
   const breakingHeadline = getBreakingHeadline(2, 80);
   
