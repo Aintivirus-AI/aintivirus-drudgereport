@@ -1689,7 +1689,7 @@ body.nav-no-scroll {
 .ribbon-coin {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   padding: 0 0.35rem;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.75rem;
@@ -1746,6 +1746,7 @@ body.nav-no-scroll {
 .ribbon-change {
   font-weight: 600;
   font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 .ribbon-change-up {
@@ -1762,7 +1763,7 @@ body.nav-no-scroll {
   color: rgba(255, 255, 255, 0.55);
   font-size: 0.65rem;
   font-weight: 400;
-  margin-left: 0.1rem;
+  white-space: nowrap;
 }
 
 .ribbon-separator {
@@ -2990,15 +2991,13 @@ body.nav-no-scroll {
   color: rgba(0, 0, 0, 0.7);
 }
 
-/* Responsive: hide ticker quick-links on mobile */
-@media (max-width: 640px) {
+/* Responsive: hide ticker quick-links only on very narrow screens */
+@media (max-width: 374px) {
   .token-ticker-sep,
   .token-ticker-link {
     display: none;
   }
-}
 
-@media (max-width: 380px) {
   .token-ticker-inner {
     font-size: 0.65rem;
     gap: 0.3rem;
