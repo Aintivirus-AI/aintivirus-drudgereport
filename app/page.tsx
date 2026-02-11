@@ -80,7 +80,6 @@ export default function Home() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hot-topic-link text-base hover:underline font-bold"
-                        title={headline.title}
                       >
                         {headline.title}
                       </a>
@@ -134,7 +133,6 @@ export default function Home() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hot-topic-link text-base hover:underline font-bold"
-                          title={headline.title}
                         >
                           {headline.title}
                         </a>

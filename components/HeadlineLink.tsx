@@ -52,7 +52,6 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="neon-link text-sm hover:underline leading-tight flex-1"
-                      title={headline.title}
                     >
                       {headline.title}
                     </a>
@@ -63,7 +62,6 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="neon-link text-sm hover:underline leading-tight flex-1"
-                    title={headline.title}
                   >
                     {headline.title}
                   </a>
@@ -103,7 +101,6 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
             target="_blank"
             rel="noopener noreferrer"
             className="neon-link text-sm hover:underline flex-1"
-            title={headline.title}
           >
             {headline.title}
           </a>
@@ -114,7 +111,6 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="neon-link text-sm hover:underline flex-1"
-          title={headline.title}
         >
           {headline.title}
         </a>
