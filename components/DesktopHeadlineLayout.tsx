@@ -46,9 +46,9 @@ export function DesktopHeadlineLayout({
       {/* Desktop filter icons – far right */}
       <div className="flex justify-end gap-1 mb-4">
         <button
-          onClick={() => setSortMode("popular")}
-          className={`desktop-filter-icon ${sortMode === "popular" ? "desktop-filter-icon--active" : ""}`}
-          title="Popular"
+          onClick={() => setSortMode("recent")}
+          className={`desktop-filter-icon ${sortMode === "recent" ? "desktop-filter-icon--active" : ""}`}
+          title="Newest"
         >
           <svg
             viewBox="0 0 24 24"
@@ -57,8 +57,9 @@ export function DesktopHeadlineLayout({
             strokeWidth="2"
             className="w-3.5 h-3.5"
           >
-            <path
-              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+            <circle cx="12" cy="12" r="10" />
+            <polyline
+              points="12 6 12 12 16 14"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -89,9 +90,9 @@ export function DesktopHeadlineLayout({
           </svg>
         </button>
         <button
-          onClick={() => setSortMode("recent")}
-          className={`desktop-filter-icon ${sortMode === "recent" ? "desktop-filter-icon--active" : ""}`}
-          title="Newest"
+          onClick={() => setSortMode("popular")}
+          className={`desktop-filter-icon ${sortMode === "popular" ? "desktop-filter-icon--active" : ""}`}
+          title="Popular"
         >
           <svg
             viewBox="0 0 24 24"
@@ -100,9 +101,8 @@ export function DesktopHeadlineLayout({
             strokeWidth="2"
             className="w-3.5 h-3.5"
           >
-            <circle cx="12" cy="12" r="10" />
-            <polyline
-              points="12 6 12 12 16 14"
+            <path
+              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
