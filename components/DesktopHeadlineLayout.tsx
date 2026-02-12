@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { Headline } from "@/lib/types";
+import type { Headline, MainHeadlineData } from "@/lib/types";
 import { HeadlineColumn } from "./HeadlineColumn";
 import { MainHeadline } from "./MainHeadline";
 
@@ -9,7 +9,7 @@ type SortMode = "popular" | "recent";
 
 interface DesktopHeadlineLayoutProps {
   headlines: Headline[];
-  mainHeadline: Headline | null;
+  mainHeadline: MainHeadlineData | null;
 }
 
 export function DesktopHeadlineLayout({
