@@ -34,11 +34,12 @@ export function DesktopHeadlineLayout({
 
   return (
     <div>
-      {/* Desktop filter tabs */}
-      <div className="flex justify-center gap-2 mb-6">
+      {/* Desktop filter icons – far right */}
+      <div className="flex justify-end gap-1 mb-4">
         <button
           onClick={() => setSortMode("popular")}
-          className={`desktop-filter-tab ${sortMode === "popular" ? "desktop-filter-tab--active" : ""}`}
+          className={`desktop-filter-icon ${sortMode === "popular" ? "desktop-filter-icon--active" : ""}`}
+          title="Popular"
         >
           <svg
             viewBox="0 0 24 24"
@@ -53,11 +54,11 @@ export function DesktopHeadlineLayout({
               strokeLinejoin="round"
             />
           </svg>
-          Popular
         </button>
         <button
           onClick={() => setSortMode("recent")}
-          className={`desktop-filter-tab ${sortMode === "recent" ? "desktop-filter-tab--active" : ""}`}
+          className={`desktop-filter-icon ${sortMode === "recent" ? "desktop-filter-icon--active" : ""}`}
+          title="Newest"
         >
           <svg
             viewBox="0 0 24 24"
@@ -73,7 +74,6 @@ export function DesktopHeadlineLayout({
               strokeLinejoin="round"
             />
           </svg>
-          Newest
         </button>
       </div>
 
