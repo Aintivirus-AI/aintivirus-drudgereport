@@ -3,9 +3,12 @@
  *
  * POST: Generate speech audio from text using the McAfee cloned voice.
  * Returns audio/mpeg stream.
+ *
+ * SECURITY: Rate-limited per IP to prevent cost abuse.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_MCAFEE_VOICE_ID;
@@ -15,15 +18,49 @@ const audioCache = new Map<string, { buffer: ArrayBuffer; timestamp: number }>()
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_CACHE_ENTRIES = 100;
 
-function getCacheKey(text: string): string {
-  // Use a simple hash of the text as cache key
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0; // Convert to 32-bit integer
+// Rate limiting: max requests per IP per window
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 5; // 5 TTS requests per minute per IP
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function getRateLimitKey(request: NextRequest): string {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+  return ip;
+}
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(key, { count: 1, windowStart: now });
+    return true;
   }
-  return `tts_${hash}`;
+
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
+// Periodically clean up stale rate limit entries (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap) {
+    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+function getCacheKey(text: string): string {
+  // Use SHA-256 for collision-resistant cache keys
+  return `tts_${crypto.createHash("sha256").update(text).digest("hex").substring(0, 16)}`;
 }
 
 function pruneCache() {
@@ -45,6 +82,15 @@ function pruneCache() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit check
+    const rateLimitKey = getRateLimitKey(request);
+    if (!checkRateLimit(rateLimitKey)) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again in a minute." },
+        { status: 429 }
+      );
+    }
+
     if (!ELEVENLABS_API_KEY || !ELEVENLABS_VOICE_ID) {
       return NextResponse.json(
         { error: "TTS service not configured" },

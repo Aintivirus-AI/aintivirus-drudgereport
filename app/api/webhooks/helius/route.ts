@@ -25,6 +25,34 @@ const MASTER_WALLET = process.env.MASTER_WALLET_PUBLIC_KEY || "";
 // Minimum amount to process (avoid dust transactions)
 const MIN_REVENUE_LAMPORTS = 10_000; // 0.00001 SOL
 
+// Replay protection: track processed transaction signatures
+const processedSignatures = new Map<string, number>(); // signature → timestamp
+const MAX_PROCESSED_SIGNATURES = 10_000;
+const SIGNATURE_TTL_MS = 24 * 60 * 60 * 1000; // Keep for 24 hours
+
+// Max webhook age to accept (prevent replay of very old webhooks)
+const MAX_WEBHOOK_AGE_SECONDS = 300; // 5 minutes
+
+// Max transactions per webhook payload
+const MAX_TRANSACTIONS_PER_PAYLOAD = 50;
+
+function isSignatureProcessed(signature: string): boolean {
+  return processedSignatures.has(signature);
+}
+
+function markSignatureProcessed(signature: string): void {
+  processedSignatures.set(signature, Date.now());
+  // Prune old entries if the map grows too large
+  if (processedSignatures.size > MAX_PROCESSED_SIGNATURES) {
+    const now = Date.now();
+    for (const [sig, ts] of processedSignatures) {
+      if (now - ts > SIGNATURE_TTL_MS) {
+        processedSignatures.delete(sig);
+      }
+    }
+  }
+}
+
 /**
  * Verify the webhook request is from Helius.
  * SECURITY: Defaults to DENY when the secret is not configured.
@@ -152,14 +180,49 @@ export async function POST(request: NextRequest) {
     // Helius sends an array of transactions
     const transactions: HeliusTransaction[] = Array.isArray(body) ? body : [body];
 
+    // Limit payload size to prevent DoS
+    if (transactions.length > MAX_TRANSACTIONS_PER_PAYLOAD) {
+      console.warn(`[HeliusWebhook] Payload too large: ${transactions.length} transactions (max ${MAX_TRANSACTIONS_PER_PAYLOAD})`);
+      return NextResponse.json(
+        { error: "Payload too large" },
+        { status: 413 }
+      );
+    }
+
     console.log(
       `[HeliusWebhook] Received ${transactions.length} transaction(s)`
     );
 
     let processed = 0;
     let distributed = 0;
+    let skippedReplay = 0;
 
     for (const tx of transactions) {
+      // Validate transaction has a signature
+      if (!tx.signature || typeof tx.signature !== "string") {
+        console.warn("[HeliusWebhook] Transaction missing signature, skipping");
+        continue;
+      }
+
+      // Replay protection: skip already-processed signatures
+      if (isSignatureProcessed(tx.signature)) {
+        console.log(`[HeliusWebhook] Skipping already-processed tx ${tx.signature}`);
+        skippedReplay++;
+        continue;
+      }
+
+      // Timestamp validation: reject very old transactions
+      if (tx.timestamp) {
+        const txAgeSeconds = Math.floor(Date.now() / 1000) - tx.timestamp;
+        if (txAgeSeconds > MAX_WEBHOOK_AGE_SECONDS) {
+          console.warn(`[HeliusWebhook] Stale tx ${tx.signature} (${txAgeSeconds}s old), skipping`);
+          continue;
+        }
+      }
+
+      // Mark as processed BEFORE distribution to prevent race conditions
+      markSignatureProcessed(tx.signature);
+
       processed++;
       console.log(
         `[HeliusWebhook] Processing tx ${tx.signature} (type: ${tx.type})`
@@ -215,6 +278,7 @@ export async function POST(request: NextRequest) {
       success: true,
       processed,
       distributed,
+      skippedReplay,
       timestamp: Date.now(),
     });
   } catch (error) {

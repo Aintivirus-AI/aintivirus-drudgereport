@@ -63,7 +63,8 @@ export function SentimentMeter({ alwaysShow = false }: SentimentMeterProps) {
   }
 
   const total = sentiment.wagmi + sentiment.ngmi;
-  const wagmiPercent = Math.round(sentiment.ratio * 100);
+  // Derive percentages from raw counts (not pre-rounded ratio) to avoid rounding drift
+  const wagmiPercent = total > 0 ? Math.round((sentiment.wagmi / total) * 100) : 0;
   const ngmiPercent = 100 - wagmiPercent;
 
   // Determine sentiment label

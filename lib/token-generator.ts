@@ -183,10 +183,18 @@ function generateFallbackTicker(text: string): string {
   let uniqueTicker = ticker.substring(0, TICKER_MAX_LENGTH);
   let attempts = 0;
 
-  while (tickerExists(uniqueTicker) && attempts < 100) {
-    // Append random uppercase letters instead of numbers (maintains letters-only constraint)
-    const randomChar = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-    uniqueTicker = ticker.substring(0, TICKER_MAX_LENGTH - 1) + randomChar;
+  while (tickerExists(uniqueTicker) && attempts < 200) {
+    // Progressively replace more characters to expand the collision space:
+    // attempts 0-25:   replace last 1 char (26 combos)
+    // attempts 26-100: replace last 2 chars (676 combos)
+    // attempts 101+:   replace last 3 chars (17,576 combos)
+    const suffixLen = attempts < 26 ? 1 : attempts < 100 ? 2 : 3;
+    const baseLen = Math.max(TICKER_MIN_LENGTH - suffixLen, 1);
+    let suffix = "";
+    for (let i = 0; i < suffixLen; i++) {
+      suffix += String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    }
+    uniqueTicker = (ticker.substring(0, baseLen) + suffix).substring(0, TICKER_MAX_LENGTH);
     attempts++;
   }
 

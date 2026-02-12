@@ -10,16 +10,60 @@ import crypto from "crypto";
 import { castVote, getVoteCounts, getGlobalSentiment, hasVoted } from "@/lib/db";
 import { ActivityLog } from "@/lib/activity-logger";
 
+// Rate limiting for vote POST
+const VOTE_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const VOTE_RATE_LIMIT_MAX = 30; // 30 votes per minute per IP
+const voteRateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkVoteRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = voteRateLimitMap.get(key);
+  if (!entry || now - entry.windowStart > VOTE_RATE_LIMIT_WINDOW_MS) {
+    voteRateLimitMap.set(key, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= VOTE_RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+// Periodically clean up stale vote rate limit entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of voteRateLimitMap) {
+    if (now - entry.windowStart > VOTE_RATE_LIMIT_WINDOW_MS * 2) {
+      voteRateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 /**
- * Create a voter hash from IP + user-agent for dedup without storing PII.
+ * Create a voter hash from multiple signals for dedup without storing PII.
+ * Uses IP + User-Agent + Accept-Language + a server-side salt to make
+ * the hash resistant to spoofing any single header.
  */
+const VOTER_HASH_SALT = process.env.API_SECRET_KEY || "default-voter-salt";
+
 function getVoterHash(request: NextRequest): string {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
     "unknown";
   const ua = request.headers.get("user-agent") || "unknown";
-  return crypto.createHash("sha256").update(`${ip}:${ua}`).digest("hex");
+  const lang = request.headers.get("accept-language") || "unknown";
+  const encoding = request.headers.get("accept-encoding") || "unknown";
+  return crypto
+    .createHash("sha256")
+    .update(`${VOTER_HASH_SALT}:${ip}:${ua}:${lang}:${encoding}`)
+    .digest("hex");
+}
+
+function getVoterIp(request: NextRequest): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
 }
 
 /**
@@ -78,6 +122,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit votes by IP
+    const voterIp = getVoterIp(request);
+    if (!checkVoteRateLimit(voterIp)) {
+      return NextResponse.json(
+        { error: "Too many votes. Please slow down." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { headline_id, vote_type } = body;
 

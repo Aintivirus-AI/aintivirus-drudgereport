@@ -206,13 +206,15 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 
-  // Catch unhandled errors to prevent silent crashes
+  // Catch unhandled errors — trigger shutdown to clean up timers and in-progress work
   process.on("uncaughtException", (error) => {
-    console.error("[Worker] Uncaught exception:", error);
+    console.error("[Worker] Uncaught exception — initiating shutdown:", error);
+    shutdown("uncaughtException").catch(() => process.exit(1));
   });
 
   process.on("unhandledRejection", (reason) => {
-    console.error("[Worker] Unhandled rejection:", reason);
+    console.error("[Worker] Unhandled rejection — initiating shutdown:", reason);
+    shutdown("unhandledRejection").catch(() => process.exit(1));
   });
 }
 

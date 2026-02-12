@@ -11,9 +11,14 @@ const BLOCKED_HOSTNAMES = new Set([
   "0.0.0.0",
   "::1",
   "[::1]",
+  // Cloud metadata endpoints (SSRF targets)
   "metadata.google.internal",
   "metadata.google",
   "metadata",
+  "169.254.169.254",          // AWS EC2 / Azure IMDS / GCP metadata
+  "100.100.100.200",          // Alibaba Cloud metadata
+  "metadata.tencentyun.com",  // Tencent Cloud metadata
+  "169.254.170.2",            // AWS ECS task metadata
 ]);
 
 const BLOCKED_IP_PATTERNS: RegExp[] = [
@@ -77,17 +82,43 @@ function normaliseIp(hostname: string): string | null {
 
 /**
  * Check if an IPv6 address is private/internal.
+ * Covers loopback, IPv4-mapped, IPv4-compatible, link-local, and unique-local.
  */
 function isPrivateIPv6(hostname: string): boolean {
   const clean = hostname.replace(/^\[|\]$/g, "").toLowerCase();
 
   // Loopback
-  if (clean === "::1") return true;
+  if (clean === "::1" || clean === "0:0:0:0:0:0:0:1") return true;
 
-  // IPv4-mapped IPv6 (::ffff:127.0.0.1)
-  const v4Mapped = clean.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (v4Mapped) {
-    const ipv4 = v4Mapped[1];
+  // Unspecified address
+  if (clean === "::" || clean === "0:0:0:0:0:0:0:0") return true;
+
+  // IPv4-mapped IPv6 (::ffff:127.0.0.1 or ::ffff:7f00:1)
+  const v4MappedDotted = clean.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4MappedDotted) {
+    const ipv4 = v4MappedDotted[1];
+    for (const pattern of BLOCKED_IP_PATTERNS) {
+      if (pattern.test(ipv4)) return true;
+    }
+    return BLOCKED_HOSTNAMES.has(ipv4);
+  }
+
+  // IPv4-mapped IPv6 in hex form (::ffff:7f00:0001)
+  const v4MappedHex = clean.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4MappedHex) {
+    const high = parseInt(v4MappedHex[1], 16);
+    const low = parseInt(v4MappedHex[2], 16);
+    const ipv4 = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+    for (const pattern of BLOCKED_IP_PATTERNS) {
+      if (pattern.test(ipv4)) return true;
+    }
+    return BLOCKED_HOSTNAMES.has(ipv4);
+  }
+
+  // IPv4-compatible IPv6 (deprecated but still possible: ::127.0.0.1)
+  const v4Compat = clean.match(/^::(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4Compat) {
+    const ipv4 = v4Compat[1];
     for (const pattern of BLOCKED_IP_PATTERNS) {
       if (pattern.test(ipv4)) return true;
     }
@@ -124,7 +155,8 @@ export function isUrlSafe(urlString: string): { safe: boolean; reason?: string }
     }
 
     // Block hostnames that end with known internal TLDs
-    if (hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+    const internalTLDs = [".local", ".internal", ".corp", ".lan", ".home", ".localdomain", ".localhost", ".intranet"];
+    if (internalTLDs.some(tld => hostname.endsWith(tld))) {
       return { safe: false, reason: "URL points to an internal host" };
     }
 

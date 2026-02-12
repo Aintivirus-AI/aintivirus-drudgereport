@@ -3741,3 +3741,61 @@ body.nav-no-scroll {
 [data-theme="light"] .earn-modal-subtitle {
   color: rgba(0, 0, 0, 0.5);
 }
+
+/* ============= ACCESSIBILITY: prefers-reduced-motion ============= */
+/* Disables all animations for users who have requested reduced motion.
+   WCAG 2.3.1 compliance — prevents seizure risk from flashing content. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .siren-light,
+  .siren-light-left,
+  .siren-light-right {
+    display: none !important;
+  }
+
+  .siren-banner {
+    animation: none !important;
+  }
+
+  .ribbon-track {
+    animation: none !important;
+  }
+}
+
+/* Screen reader only utility class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Fade-in animation for post-vote share prompt */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Line clamp utility for text truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

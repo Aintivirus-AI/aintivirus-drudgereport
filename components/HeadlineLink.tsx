@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Headline } from "@/lib/types";
 import { TokenBadge, TokenBadgeCompact } from "./TokenBadge";
 import { ShareButton } from "./ShareButton";
@@ -29,10 +30,13 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <img
+                <Image
                   src={headline.image_url}
-                  alt=""
+                  alt={headline.title}
+                  width={64}
+                  height={64}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                  loading="lazy"
                 />
               </a>
               {/* Token badge overlay on image */}

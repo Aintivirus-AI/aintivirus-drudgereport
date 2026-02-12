@@ -204,7 +204,8 @@ export function estimateDistribution(amountLamports: number): {
   submitterShareSol: number;
   creatorShareSol: number;
 } {
-  const sharePercent = parseFloat(process.env.REVENUE_SUBMITTER_SHARE || "0.5");
+  const rawPercent = parseFloat(process.env.REVENUE_SUBMITTER_SHARE || "0.5");
+  const sharePercent = isNaN(rawPercent) ? 0.5 : Math.max(0, Math.min(1, rawPercent));
   const submitterShare = Math.floor(amountLamports * sharePercent);
   const creatorShare = amountLamports - submitterShare;
   

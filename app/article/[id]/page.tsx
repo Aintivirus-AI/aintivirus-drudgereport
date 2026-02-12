@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getHeadlineWithDetails } from "@/lib/db";
+import dynamic from "next/dynamic";
+import { getHeadlineWithDetails, getRelatedHeadlines } from "@/lib/db";
 import { TokenBadge } from "@/components/TokenBadge";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { CopyAddressButton } from "@/components/CopyAddressButton";
@@ -10,7 +11,12 @@ import { McAfeeCommentary } from "@/components/McAfeeCommentary";
 import { VoteButtons } from "@/components/VoteButtons";
 import { SubmitCTA } from "@/components/SubmitCTA";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ArticleChat } from "@/components/ArticleChat";
+
+// Lazy-load ArticleChat — it's a heavy interactive component most users never open
+const ArticleChat = dynamic(() => import("@/components/ArticleChat").then(m => m.ArticleChat), {
+  ssr: false,
+  loading: () => <div className="article-chat-placeholder text-center text-gray-500 py-8 text-sm">Loading chat...</div>,
+});
 
 export const revalidate = 30;
 
@@ -35,6 +41,9 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
   return {
     title: `${article.title} | The McAfee Report`,
     description,
+    alternates: {
+      canonical: articleUrl,
+    },
     openGraph: {
       title: article.title,
       description,
@@ -60,15 +69,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const articleUrl = `${siteUrl}/article/${article.id}`;
+  const articleUrlX = `${articleUrl}?utm_source=mcafee_report&utm_medium=x&utm_campaign=article_share`;
+  const articleUrlTg = `${articleUrl}?utm_source=mcafee_report&utm_medium=telegram&utm_campaign=article_share`;
   const tweetLines = [article.title];
   if (article.token?.ticker && article.token?.pump_url) {
     tweetLines.push(`\n$${article.token.ticker} just launched\n${article.token.pump_url}`);
   } else if (article.token?.ticker) {
     tweetLines.push(`\n$${article.token.ticker}`);
   }
-  tweetLines.push(`\n${articleUrl}`);
+  tweetLines.push(`\n${articleUrlX}`);
   const tweetText = encodeURIComponent(tweetLines.join(""));
-  const telegramShareUrl = encodeURIComponent(articleUrl);
+  const telegramShareUrl = encodeURIComponent(articleUrlTg);
 
   const publishedDate = new Date(article.created_at);
 
@@ -83,8 +94,29 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     }
   }
 
+  // NewsArticle JSON-LD for rich search results
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: article.title,
+    url: articleUrl,
+    datePublished: article.created_at,
+    dateModified: article.created_at,
+    image: article.image_url ? [article.image_url] : undefined,
+    description: articleSummary || article.title,
+    publisher: {
+      "@type": "Organization",
+      name: "The McAfee Report",
+      logo: { "@type": "ImageObject", url: `${siteUrl}/mcafee-logo.png` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
+  };
+
   return (
     <main className="main-content">
+      {/* NewsArticle structured data */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
       <div className="min-h-screen grid-bg">
       {/* Header bar */}
       <div className="border-b border-dark-200/30 py-4">
@@ -143,7 +175,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
         {/* WAGMI/NGMI Voting */}
         <div className="mb-6">
-          <VoteButtons headlineId={article.id} />
+          <VoteButtons headlineId={article.id} headlineTitle={article.title} />
         </div>
 
         {/* Meta info */}
@@ -305,6 +337,43 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </a>
           <CopyLinkButton url={articleUrl} />
         </div>
+
+        {/* Related Articles — prevents dead-end user journeys */}
+        {(() => {
+          const related = getRelatedHeadlines(article.id, 6);
+          if (related.length === 0) return null;
+          return (
+            <div className="border-t border-dark-200/30 pt-8 mb-8">
+              <h2 className="text-lg font-bold text-white mb-4 tracking-wide">YOU MIGHT ALSO LIKE</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {related.map((h) => (
+                  <a
+                    key={h.id}
+                    href={`/article/${h.id}`}
+                    className="block p-3 rounded-lg border border-dark-200/30 hover:border-neon-cyan/30 bg-dark-100/30 hover:bg-dark-100/60 transition-all group"
+                  >
+                    {h.image_url && (
+                      <div className="rounded overflow-hidden mb-2 h-24">
+                        <img
+                          src={h.image_url}
+                          alt=""
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+                    <h3 className="text-sm font-medium text-gray-200 group-hover:text-neon-cyan transition-colors leading-tight line-clamp-2">
+                      {h.title}
+                    </h3>
+                    {h.token && (
+                      <span className="inline-block mt-1 text-xs text-neon-cyan/70 font-mono">${h.token.ticker}</span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* How to Earn CTA */}
         <div className="border-t border-dark-200/30 pt-8">

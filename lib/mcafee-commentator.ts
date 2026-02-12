@@ -125,7 +125,12 @@ Respond with ONLY a number between 0 and 100. Nothing else.`,
     });
 
     const scoreText = response.choices[0]?.message?.content?.trim() || "50";
-    const score = Math.min(100, Math.max(0, parseInt(scoreText, 10) || 50));
+    const parsed = parseInt(scoreText, 10);
+    const didDefault = isNaN(parsed);
+    const score = Math.min(100, Math.max(0, didDefault ? 50 : parsed));
+    if (didDefault) {
+      console.warn(`[McAfee] Importance scoring returned non-numeric response "${scoreText}", defaulting to 50`);
+    }
     console.log(`[McAfee] Importance score for "${safeHeadline.slice(0, 50)}...": ${score}`);
     return score;
   } catch (error) {
@@ -256,7 +261,13 @@ Respond in this EXACT JSON format — no markdown, no code fences:
 
     // Parse JSON — strip code fences if the model wraps them anyway
     const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
-    const parsed = JSON.parse(jsonStr);
+    let parsed: { headline?: string; summary?: string };
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error("[McAfee] Failed to parse tweet headline JSON:", jsonStr);
+      throw new Error("AI returned invalid JSON for tweet headline");
+    }
 
     const headline: string = (parsed.headline || "").trim();
     const summary: string = (parsed.summary || "").trim();

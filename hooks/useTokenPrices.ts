@@ -17,7 +17,7 @@ interface TokenPriceMap {
   [ticker: string]: TokenPrice;
 }
 
-const POLL_INTERVAL_MS = 20_000; // 20 seconds
+const POLL_INTERVAL_MS = 30_000; // 30 seconds (reduced from 20s to cut network traffic)
 
 /**
  * Global shared price store so all TokenBadge components share one poll.
@@ -79,6 +79,17 @@ function stopPolling() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+}
+
+// Pause polling when tab is hidden to save battery and bandwidth
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopPolling();
+    } else if (globalListeners.size > 0) {
+      startPolling();
+    }
+  });
 }
 
 // useSyncExternalStore API: subscribe function

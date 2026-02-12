@@ -33,6 +33,8 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better performance
 db.pragma("journal_mode = WAL");
+// Set busy timeout to handle concurrent writes from multiple processes (web, bot, scheduler)
+db.pragma("busy_timeout = 5000");
 
 // Initialize tables
 db.exec(`
@@ -967,17 +969,22 @@ export function updateTokenDeployment(
 }
 
 /**
- * Link token to headline
+ * Link token to headline.
+ * Uses a transaction to ensure both updates succeed or neither does.
  */
 export function linkTokenToHeadline(tokenId: number, headlineId: number): boolean {
-  // Update token's headline_id
-  const stmt1 = db.prepare(`UPDATE tokens SET headline_id = ? WHERE id = ?`);
-  stmt1.run(headlineId, tokenId);
-  
-  // Update headline's token_id
-  const stmt2 = db.prepare(`UPDATE headlines SET token_id = ? WHERE id = ?`);
-  const result = stmt2.run(tokenId, headlineId);
-  return result.changes > 0;
+  const txn = db.transaction(() => {
+    // Update token's headline_id
+    const stmt1 = db.prepare(`UPDATE tokens SET headline_id = ? WHERE id = ?`);
+    stmt1.run(headlineId, tokenId);
+    
+    // Update headline's token_id
+    const stmt2 = db.prepare(`UPDATE headlines SET token_id = ? WHERE id = ?`);
+    const result = stmt2.run(tokenId, headlineId);
+    return result.changes > 0;
+  });
+
+  return txn();
 }
 
 /**
@@ -1004,7 +1011,9 @@ export function tickerExists(ticker: string): boolean {
 // ============= REVENUE EVENTS CRUD =============
 
 // Revenue split — single source of truth (configurable via env)
-const SUBMITTER_SHARE_PERCENT = parseFloat(process.env.REVENUE_SUBMITTER_SHARE || "0.5");
+// Clamped to [0, 1] to prevent negative or over-100% shares
+const _rawSharePercent = parseFloat(process.env.REVENUE_SUBMITTER_SHARE || "0.5");
+const SUBMITTER_SHARE_PERCENT = isNaN(_rawSharePercent) ? 0.5 : Math.max(0, Math.min(1, _rawSharePercent));
 
 /**
  * Create a new revenue event
@@ -1228,6 +1237,42 @@ export function getBreakingHeadline(
       image_url: row.token_image_url || undefined,
     } : undefined
   };
+}
+
+/**
+ * Get related headlines for an article (for "You might also like" section).
+ * Returns recent headlines excluding the current one, ordered by recency.
+ */
+export function getRelatedHeadlines(excludeId: number, limit: number = 6): Headline[] {
+  const stmt = db.prepare(`
+    SELECT 
+      h.id, h.title, h.url, h.column, h.image_url, h.token_id, h.created_at,
+      h.importance_score, h.mcafee_take,
+      t.ticker, t.pump_url, t.image_url as token_image_url
+    FROM headlines h
+    LEFT JOIN tokens t ON h.token_id = t.id
+    WHERE h.id != ?
+    ORDER BY h.created_at DESC
+    LIMIT ?
+  `);
+  const rows = stmt.all(excludeId, limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
+
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    column: row.column,
+    image_url: row.image_url,
+    token_id: row.token_id,
+    created_at: row.created_at,
+    importance_score: row.importance_score || 0,
+    mcafee_take: row.mcafee_take || null,
+    token: row.ticker ? {
+      ticker: row.ticker,
+      pump_url: row.pump_url || "",
+      image_url: row.token_image_url || undefined,
+    } : undefined
+  }));
 }
 
 // ============= VOTES CRUD (WAGMI/NGMI) =============

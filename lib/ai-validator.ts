@@ -169,7 +169,13 @@ Respond with a JSON object:
     });
 
     const response = completion.choices[0]?.message?.content || "{}";
-    const result = JSON.parse(response);
+    let result: { score?: number; reason?: string };
+    try {
+      result = JSON.parse(response);
+    } catch (parseError) {
+      console.error("[FactCheck] Failed to parse AI response as JSON:", response);
+      result = { score: 30, reason: "AI returned invalid JSON" };
+    }
 
     return {
       score: Math.min(100, Math.max(0, result.score || 0)),
@@ -263,7 +269,13 @@ If you truly cannot determine ANY date, respond with:
     });
 
     const response = completion.choices[0]?.message?.content || "{}";
-    const result = JSON.parse(response);
+    let result: { date?: string | null; source?: string; confidence?: string };
+    try {
+      result = JSON.parse(response);
+    } catch (parseError) {
+      console.error("[Freshness] Failed to parse AI response as JSON:", response);
+      result = { date: null, source: "parse error", confidence: "none" };
+    }
 
     console.log(
       `[Freshness] AI extraction for ${url}: ${JSON.stringify(result)}`
@@ -499,7 +511,13 @@ IMPORTANT: Only flag as duplicate if it's clearly the SAME specific event. Relat
         });
 
         const response = completion.choices[0]?.message?.content || "{}";
-        const result = JSON.parse(response);
+        let result: { isDuplicate?: boolean; matchIndex?: number | null; reason?: string };
+        try {
+          result = JSON.parse(response);
+        } catch (parseError) {
+          console.error("[Duplicates] Failed to parse AI response as JSON:", response);
+          result = { isDuplicate: false, matchIndex: null, reason: "parse error" };
+        }
 
         console.log(
           `[Duplicates] AI headline check for #${submissionId}: ${JSON.stringify(result)}`

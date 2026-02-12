@@ -1,10 +1,15 @@
+import dynamic from "next/dynamic";
 import { MainHeadline } from "@/components/MainHeadline";
 import { HeadlineColumn } from "@/components/HeadlineColumn";
 import { MobileHeadlineList } from "@/components/MobileHeadlineList";
 import { TokenTicker } from "@/components/TokenTicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BreakingSiren } from "@/components/BreakingSiren";
 import { getSidebarHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
+
+// Lazy-load BreakingSiren (Web Audio API, animations) — only renders when there's breaking news
+const BreakingSiren = dynamic(() => import("@/components/BreakingSiren").then(m => m.BreakingSiren), {
+  ssr: false,
+});
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
