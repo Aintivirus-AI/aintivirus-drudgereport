@@ -1,6 +1,6 @@
 import { MainHeadline } from "@/components/MainHeadline";
-import { HeadlineColumn } from "@/components/HeadlineColumn";
 import { MobileHeadlineList } from "@/components/MobileHeadlineList";
+import { DesktopHeadlineLayout } from "@/components/DesktopHeadlineLayout";
 import { TokenTicker } from "@/components/TokenTicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
@@ -10,10 +10,7 @@ import { getSidebarHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib
 export const revalidate = 10;
 
 export default function Home() {
-  // Fetch all sidebar headlines in one sorted list, then distribute evenly
   const allSidebarHeadlines = getSidebarHeadlines(72);
-  const leftHeadlines = allSidebarHeadlines.filter((_, i) => i % 2 === 0);
-  const rightHeadlines = allSidebarHeadlines.filter((_, i) => i % 2 === 1);
   const mainHeadline = getMainHeadline();
   const breakingHeadline = getBreakingHeadline(2, 80);
   
@@ -71,22 +68,12 @@ export default function Home() {
             <MobileHeadlineList headlines={allSidebarHeadlines} />
           </div>
 
-          {/* Desktop: Three column layout */}
-          <div className="hidden lg:grid lg:grid-cols-4 gap-8">
-            {/* Left Column */}
-            <div className="lg:col-span-1">
-              <HeadlineColumn headlines={leftHeadlines} />
-            </div>
-
-            {/* Center - Main Headline */}
-            <div className="lg:col-span-2">
-              <MainHeadline headline={mainHeadline} />
-            </div>
-
-            {/* Right Column */}
-            <div className="lg:col-span-1">
-              <HeadlineColumn headlines={rightHeadlines} />
-            </div>
+          {/* Desktop: Three column layout with filter */}
+          <div className="hidden lg:block">
+            <DesktopHeadlineLayout
+              headlines={allSidebarHeadlines}
+              mainHeadline={mainHeadline}
+            />
           </div>
         </div>
 
