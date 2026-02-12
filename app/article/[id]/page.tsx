@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
 import { getHeadlineWithDetails, getRelatedHeadlines } from "@/lib/db";
 import { TokenBadge } from "@/components/TokenBadge";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
@@ -11,12 +10,7 @@ import { McAfeeCommentary } from "@/components/McAfeeCommentary";
 import { VoteButtons } from "@/components/VoteButtons";
 import { SubmitCTA } from "@/components/SubmitCTA";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-// Lazy-load ArticleChat — it's a heavy interactive component most users never open
-const ArticleChat = dynamic(() => import("@/components/ArticleChat").then(m => m.ArticleChat), {
-  ssr: false,
-  loading: () => <div className="article-chat-placeholder text-center text-gray-500 py-8 text-sm">Loading chat...</div>,
-});
+import { ArticleChat } from "@/components/ArticleChat";
 
 export const revalidate = 30;
 
