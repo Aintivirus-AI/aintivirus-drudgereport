@@ -236,7 +236,7 @@ export function getHeadlines(
     ORDER BY wagmi_count DESC, h.created_at DESC
     LIMIT ?
   `);
-  const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
+  const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string; wagmi_count: number }>;
   
   return rows.map(row => ({
     id: row.id,
@@ -248,6 +248,7 @@ export function getHeadlines(
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: row.wagmi_count || 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",
@@ -275,7 +276,7 @@ export function getSidebarHeadlines(limit: number = 72): Headline[] {
     ORDER BY wagmi_count DESC, h.created_at DESC
     LIMIT ?
   `);
-  const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string }>;
+  const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string; wagmi_count: number }>;
   
   return rows.map(row => ({
     id: row.id,
@@ -287,6 +288,7 @@ export function getSidebarHeadlines(limit: number = 72): Headline[] {
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: row.wagmi_count || 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",
@@ -322,6 +324,7 @@ export function getAllHeadlines(limit: number = 100): Headline[] {
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",
@@ -422,6 +425,7 @@ export function getHeadlineById(id: number): Headline | undefined {
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",
@@ -468,6 +472,7 @@ export function getHeadlineWithDetails(id: number): (Headline & {
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",
@@ -1231,6 +1236,7 @@ export function getBreakingHeadline(
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",
@@ -1267,6 +1273,7 @@ export function getRelatedHeadlines(excludeId: number, limit: number = 6): Headl
     created_at: row.created_at,
     importance_score: row.importance_score || 0,
     mcafee_take: row.mcafee_take || null,
+    wagmi_count: 0,
     token: row.ticker ? {
       ticker: row.ticker,
       pump_url: row.pump_url || "",

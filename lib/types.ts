@@ -8,6 +8,7 @@ export interface Headline {
   created_at: string;
   importance_score: number;
   mcafee_take: string | null;
+  wagmi_count: number;
   // Joined token data (optional)
   token?: TokenInfo;
 }
