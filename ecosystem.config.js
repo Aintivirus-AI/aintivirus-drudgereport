@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "aintivirus-web",
       script: "node_modules/.bin/next",
-      args: "start --port 3002",
+      args: "start -p 3002",
       cwd: "/var/www/aintivirus-drudgereport",
       instances: 1,
       exec_mode: "fork",
