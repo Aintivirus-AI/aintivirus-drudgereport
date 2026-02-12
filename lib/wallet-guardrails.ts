@@ -7,12 +7,11 @@
  * Configuration via environment variables (with safe defaults):
  *   MAX_TX_SOL          – Max SOL per single send (default: 1)
  *   MAX_DAILY_SOL       – Rolling 24h outflow cap (default: 10)
- *   MAX_TX_PER_MINUTE   – Rate limit per minute (default: 5)
  *   ALLOWED_DESTINATIONS – Comma-separated allowlist of addresses (optional)
  */
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getDailyOutflowLamports, getRecentTxCount, logWalletOperation } from "./wallet-audit";
+import { getDailyOutflowLamports, logWalletOperation } from "./wallet-audit";
 import { isValidSolanaAddress } from "./solana-wallet";
 
 // ---------------------------------------------------------------------------
@@ -27,11 +26,6 @@ function getMaxTxLamports(): number {
 function getMaxDailyLamports(): number {
   const sol = parseFloat(process.env.MAX_DAILY_SOL || "10");
   return Math.floor((isNaN(sol) ? 10 : sol) * LAMPORTS_PER_SOL);
-}
-
-function getMaxTxPerMinute(): number {
-  const n = parseInt(process.env.MAX_TX_PER_MINUTE || "5", 10);
-  return isNaN(n) ? 5 : n;
 }
 
 function getAllowedDestinations(): Set<string> | null {
@@ -88,16 +82,7 @@ export function checkSendGuardrails(
     return { allowed: false, reason };
   }
 
-  // 3. Rate limiting
-  const recentCount = getRecentTxCount();
-  const maxPerMinute = getMaxTxPerMinute();
-  if (recentCount >= maxPerMinute) {
-    const reason = `Rate limit exceeded: ${recentCount} transactions in the last minute (max ${maxPerMinute})`;
-    logGuardrailBlock(caller, reason, recipientAddress, lamports);
-    return { allowed: false, reason };
-  }
-
-  // 4. Destination allowlist (if configured)
+  // 3. Destination allowlist (if configured)
   const allowlist = getAllowedDestinations();
   if (allowlist !== null && !allowlist.has(recipientAddress)) {
     const reason = `Destination ${recipientAddress} is not in the allowed destinations list`;
@@ -105,7 +90,7 @@ export function checkSendGuardrails(
     return { allowed: false, reason };
   }
 
-  // 5. Basic address validation
+  // 4. Basic address validation
   if (!isValidSolanaAddress(recipientAddress)) {
     const reason = `Invalid Solana address: ${recipientAddress}`;
     logGuardrailBlock(caller, reason, recipientAddress, lamports);
@@ -117,7 +102,7 @@ export function checkSendGuardrails(
 
 /**
  * Lightweight guardrail check for non-send operations (deploy, burn)
- * that still consume SOL via fees. Only checks rate limit and daily cap.
+ * that still consume SOL via fees. Only checks daily cap.
  */
 export function checkOperationGuardrails(
   estimatedLamports: number,
@@ -134,15 +119,6 @@ export function checkOperationGuardrails(
     return { allowed: false, reason };
   }
 
-  // Rate limiting
-  const recentCount = getRecentTxCount();
-  const maxPerMinute = getMaxTxPerMinute();
-  if (recentCount >= maxPerMinute) {
-    const reason = `Rate limit exceeded: ${recentCount} transactions in the last minute (max ${maxPerMinute})`;
-    logGuardrailBlock(caller, reason, undefined, estimatedLamports);
-    return { allowed: false, reason };
-  }
-
   return { allowed: true };
 }
 
@@ -152,9 +128,7 @@ export function checkOperationGuardrails(
 export function getGuardrailStatus(): {
   maxTxSol: number;
   maxDailySol: number;
-  maxTxPerMinute: number;
   dailyOutflowSol: number;
-  recentTxCount: number;
   dailyRemainingLamports: number;
   hasAllowlist: boolean;
 } {
@@ -164,9 +138,7 @@ export function getGuardrailStatus(): {
   return {
     maxTxSol: getMaxTxLamports() / LAMPORTS_PER_SOL,
     maxDailySol: maxDaily / LAMPORTS_PER_SOL,
-    maxTxPerMinute: getMaxTxPerMinute(),
     dailyOutflowSol: dailyOutflow / LAMPORTS_PER_SOL,
-    recentTxCount: getRecentTxCount(),
     dailyRemainingLamports: Math.max(0, maxDaily - dailyOutflow),
     hasAllowlist: getAllowedDestinations() !== null,
   };
