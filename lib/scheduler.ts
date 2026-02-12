@@ -20,13 +20,15 @@ import {
   updateSubmissionCachedContent,
   updateHeadlineImportanceScore,
   updateHeadlineMcAfeeTake,
+  updateHeadlineSummary,
+  detectContentType,
 } from "./db";
 import { validateSubmission, smartFetchContent } from "./ai-validator";
 import { generateTokenMetadata } from "./token-generator";
 import { deployToken } from "./pump-deployer";
 import { notifySubmitterPublished, notifySubmitterApproved, notifySubmitterRejected } from "./telegram-notifier";
 import { tweetArticlePublished, isTwitterConfigured } from "./twitter-poster";
-import { generateMcAfeeTake, scoreHeadlineImportance } from "./mcafee-commentator";
+import { generateMcAfeeTake, scoreHeadlineImportance, generateTweetHeadlineAndSummary } from "./mcafee-commentator";
 import { ActivityLog } from "./activity-logger";
 import { ensureEnglish } from "./translator";
 import type { Submission, PageContent } from "./types";
@@ -280,8 +282,41 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       }
     }
 
-    // Use the (possibly translated) title as the headline
-    const headline = content.title || "Breaking News";
+    // For tweets, use AI to generate a clean headline and summary
+    // instead of using the raw tweet text (which is messy with emoji, links, etc.)
+    let headline = content.title || "Breaking News";
+    let tweetSummary: string | null = null;
+    const contentType = detectContentType(submission.url);
+
+    if (contentType === "tweet" && content.content) {
+      try {
+        // Extract author info from the cached description (format: "Author (Handle): text")
+        const authorMatch = content.description?.match(/^(.+?)\s*\((@\w+)\):/);
+        const authorName = authorMatch?.[1] || "";
+        const authorHandle = authorMatch?.[2] || "";
+
+        console.log(
+          `[Scheduler] Generating AI headline/summary for tweet by ${authorName} ${authorHandle}`
+        );
+
+        const tweetAI = await generateTweetHeadlineAndSummary(
+          content.content,
+          authorName,
+          authorHandle,
+          content
+        );
+
+        headline = tweetAI.headline;
+        tweetSummary = tweetAI.summary;
+
+        console.log(
+          `[Scheduler] AI tweet headline: "${headline}"`
+        );
+      } catch (tweetAIError) {
+        console.warn(`[Scheduler] Tweet AI enrichment failed, using raw text:`, tweetAIError);
+        // Falls through to use content.title as headline
+      }
+    }
 
     // Alternate left/right column based on ID
     const column = submission.id % 2 === 0 ? "left" : "right";
@@ -297,6 +332,16 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
     console.log(
       `[Scheduler] Created headline #${headlineRecord.id} for submission #${submission.id}`
     );
+
+    // Save tweet summary if we generated one
+    if (tweetSummary) {
+      try {
+        updateHeadlineSummary(headlineRecord.id, tweetSummary);
+        console.log(`[Scheduler] Saved AI tweet summary for headline #${headlineRecord.id}`);
+      } catch (summaryError) {
+        console.warn(`[Scheduler] Failed to save tweet summary:`, summaryError);
+      }
+    }
 
     // Generate AI importance score + McAfee commentary in parallel with token generation
     const aiEnrichmentPromise = (async () => {

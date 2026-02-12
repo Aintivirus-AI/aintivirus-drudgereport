@@ -1086,13 +1086,27 @@ export async function fetchTwitterContent(url: string): Promise<PageContent> {
     const oembedText = await safeFetchText(oembedUrl, { timeoutMs: 8_000 });
     const oembedData = JSON.parse(oembedText);
 
-    // oEmbed returns an HTML snippet – extract the plain text from it
+    // oEmbed returns an HTML snippet with this structure:
+    //   <blockquote><p lang="…">Tweet text <a>pic.twitter.com/…</a></p>
+    //   &mdash; Author (@handle) <a href="…">Date</a></blockquote>
+    //
+    // We extract ONLY the <p> content (the actual tweet) and discard the
+    // attribution (author + date) that comes after </p>.
     const tweetHtml: string = oembedData.html || "";
-    const tweetText = tweetHtml
-      .replace(/<blockquote[^>]*>/gi, "")
-      .replace(/<\/blockquote>/gi, "")
+
+    // 1. Grab just the <p>…</p> body (the tweet itself)
+    const pMatch = tweetHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    let tweetBodyHtml = pMatch ? pMatch[1] : tweetHtml;
+
+    // 2. Remove media links: <a …>pic.twitter.com/…</a> and bare t.co links
+    tweetBodyHtml = tweetBodyHtml
+      .replace(/<a[^>]*>\s*pic\.twitter\.com\/\w+\s*<\/a>/gi, "")
+      .replace(/<a[^>]*>\s*https?:\/\/t\.co\/\w+\s*<\/a>/gi, "");
+
+    // 3. Strip remaining HTML tags and decode entities
+    const tweetText = tweetBodyHtml
       .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<a[^>]*>(.*?)<\/a>/gi, "$1")
+      .replace(/<a[^>]*>(.*?)<\/a>/gi, "$1") // keep link text for real URLs
       .replace(/<[^>]+>/g, "")
       .replace(/&mdash;/g, "—")
       .replace(/&amp;/g, "&")

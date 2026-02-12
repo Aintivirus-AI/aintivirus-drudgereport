@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMainHeadline, setMainHeadline } from "@/lib/db";
+import { isAuthenticated } from "@/lib/auth";
 import type { SetMainHeadlineRequest } from "@/lib/types";
-
-// Simple API key auth for bot requests
-function isAuthorized(request: NextRequest): boolean {
-  const apiKey = request.headers.get("x-api-key");
-  const expectedKey = process.env.API_SECRET_KEY;
-  
-  // If no API key is configured, deny all write requests
-  if (!expectedKey) {
-    console.warn("API_SECRET_KEY not configured");
-    return false;
-  }
-  
-  return apiKey === expectedKey;
-}
 
 /**
  * GET /api/main-headline
@@ -40,8 +27,8 @@ export async function GET() {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Check authorization
-    if (!isAuthorized(request)) {
+    // Check authorization (timing-safe comparison)
+    if (!isAuthenticated(request)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

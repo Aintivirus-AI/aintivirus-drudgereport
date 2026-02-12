@@ -415,11 +415,19 @@ async function fetchTwitterContent(url: string): Promise<{ title: string; descri
     const oembedText = await safeFetchText(oembedUrl, { timeoutMs: 8_000 });
     const oembedData = JSON.parse(oembedText);
 
-    // Extract plain text from the HTML snippet
+    // Extract just the tweet body from the oEmbed HTML.
+    // Structure: <blockquote><p>tweet text</p>&mdash; Author <a>Date</a></blockquote>
+    // We grab only the <p> content and strip media links.
     const tweetHtml: string = oembedData.html || "";
-    const tweetText = tweetHtml
-      .replace(/<blockquote[^>]*>/gi, "")
-      .replace(/<\/blockquote>/gi, "")
+    const pMatch = tweetHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    let tweetBodyHtml = pMatch ? pMatch[1] : tweetHtml;
+
+    // Remove pic.twitter.com and t.co media links
+    tweetBodyHtml = tweetBodyHtml
+      .replace(/<a[^>]*>\s*pic\.twitter\.com\/\w+\s*<\/a>/gi, "")
+      .replace(/<a[^>]*>\s*https?:\/\/t\.co\/\w+\s*<\/a>/gi, "");
+
+    const tweetText = tweetBodyHtml
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<a[^>]*>(.*?)<\/a>/gi, "$1")
       .replace(/<[^>]+>/g, "")

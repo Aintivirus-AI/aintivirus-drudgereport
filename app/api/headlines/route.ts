@@ -5,21 +5,8 @@ import {
   addHeadline,
   removeHeadline,
 } from "@/lib/db";
+import { isAuthenticated } from "@/lib/auth";
 import type { AddHeadlineRequest } from "@/lib/types";
-
-// Simple API key auth for bot requests
-function isAuthorized(request: NextRequest): boolean {
-  const apiKey = request.headers.get("x-api-key");
-  const expectedKey = process.env.API_SECRET_KEY;
-  
-  // If no API key is configured, deny all write requests
-  if (!expectedKey) {
-    console.warn("API_SECRET_KEY not configured");
-    return false;
-  }
-  
-  return apiKey === expectedKey;
-}
 
 /**
  * GET /api/headlines
@@ -63,8 +50,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Check authorization
-    if (!isAuthorized(request)) {
+    // Check authorization (timing-safe comparison)
+    if (!isAuthenticated(request)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -110,8 +97,8 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Check authorization
-    if (!isAuthorized(request)) {
+    // Check authorization (timing-safe comparison)
+    if (!isAuthenticated(request)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

@@ -97,7 +97,7 @@ export function EarnModal({ open, onClose }: EarnModalProps) {
             <div>
               <p className="text-sm font-medium text-neon-green">A token launches & you earn</p>
               <p className="text-xs text-gray-400 mt-0.5">
-                Every published story auto-deploys a token on pump.fun. <span className="text-white/80 font-medium">You receive 50% of all creator fees</span> — sent directly to your wallet. The other 50% buys and burns $NEWS.
+                Every published story auto-deploys a token on pump.fun. <span className="text-white/80 font-medium">You receive 50% of all creator fees</span> — sent directly to your wallet.
               </p>
             </div>
           </div>

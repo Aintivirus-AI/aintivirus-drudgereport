@@ -4,7 +4,7 @@
  * Receives transaction notifications from Helius when the master wallet
  * receives SOL (i.e. creator fees from pump.fun). Matches the transaction
  * to a deployed token and triggers revenue distribution (50% to submitter,
- * 50% buy-and-burn $NEWS).
+ * 50% retained in creator wallet).
  *
  * Setup:
  * 1. Create a webhook at https://dashboard.helius.dev/webhooks

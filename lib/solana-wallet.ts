@@ -7,10 +7,10 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { getPrivateKeySync } from "./secrets-provider";
 
 // Configuration
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
-const MASTER_WALLET_PRIVATE_KEY = process.env.MASTER_WALLET_PRIVATE_KEY;
 
 // Connection instance (singleton)
 let connectionInstance: Connection | null = null;
@@ -30,19 +30,22 @@ export function getConnection(): Connection {
 
 /**
  * Get the master wallet keypair.
- * Decodes on every call instead of caching indefinitely in module-level memory.
- * In production, consider using a KMS (AWS KMS, HashiCorp Vault) instead.
+ *
+ * Retrieves the private key from the configured secrets provider
+ * (AWS Secrets Manager, encrypted env var, or plain env var depending
+ * on WALLET_SECRET_PROVIDER). The secrets provider handles caching internally.
+ *
+ * For AWS mode, `initializeKey()` from secrets-provider must be called
+ * once at startup before this function is used.
  */
 export function getMasterWallet(): Keypair {
-  if (!MASTER_WALLET_PRIVATE_KEY) {
-    throw new Error("MASTER_WALLET_PRIVATE_KEY environment variable not set");
-  }
-  
+  const base58Key = getPrivateKeySync();
+
   try {
-    const secretKey = bs58.decode(MASTER_WALLET_PRIVATE_KEY);
+    const secretKey = bs58.decode(base58Key);
     return Keypair.fromSecretKey(secretKey);
   } catch (error) {
-    throw new Error("Invalid MASTER_WALLET_PRIVATE_KEY format. Must be base58 encoded.");
+    throw new Error("Invalid private key format from secrets provider. Must be base58 encoded.");
   }
 }
 
@@ -324,11 +327,6 @@ export async function checkWalletConfig(): Promise<{
   issues: string[];
 }> {
   const issues: string[] = [];
-  
-  if (!MASTER_WALLET_PRIVATE_KEY) {
-    issues.push("MASTER_WALLET_PRIVATE_KEY not set");
-    return { configured: false, issues };
-  }
   
   try {
     const wallet = getMasterWallet();

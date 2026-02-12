@@ -3,6 +3,8 @@
  *
  * Generates witty, provocative one-liner hot takes in John McAfee's voice
  * for every published headline. Uses gpt-4o-mini for cost efficiency.
+ *
+ * Also generates clean headlines and summaries for tweet-sourced articles.
  */
 
 import OpenAI from "openai";
@@ -200,5 +202,80 @@ Style rules:
   } catch (error) {
     console.error("[McAfee] Failed to generate coin summary:", error);
     return "Even from beyond the grave, this project caught my attention. Check it out for yourself — do your own research, as they say. Though I never did follow that advice myself.";
+  }
+}
+
+/**
+ * Generate a clean news headline and a short summary from a tweet.
+ *
+ * Tweets are messy as headlines — they contain emoji, informal grammar,
+ * pic links, and attribution. This function uses AI to:
+ *   1. Produce a concise, professional news headline
+ *   2. Write a brief summary paragraph for the article page
+ */
+export async function generateTweetHeadlineAndSummary(
+  tweetText: string,
+  authorName: string,
+  authorHandle: string,
+  content: PageContent
+): Promise<{ headline: string; summary: string }> {
+  const safeTweet = sanitizeForPrompt(tweetText, 500);
+  const safeAuthor = sanitizeForPrompt(
+    `${authorName}${authorHandle ? ` (${authorHandle})` : ""}`,
+    100
+  );
+
+  try {
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a news editor for The McAfee Report, a crypto and tech news site.
+
+You will be given a tweet and its author. Your job:
+
+1. HEADLINE: Write a concise, professional news headline (max 120 characters). The headline should read like a real news headline — clear, informative, and attention-grabbing. Remove emoji, informal language, and unnecessary filler. Do NOT include the author name in the headline unless they are the subject of the news.
+
+2. SUMMARY: Write a 2-3 sentence summary that explains the news from the tweet. Include the source attribution (who reported it). Add any relevant context that makes the news easier to understand. Write in a neutral, informative tone.
+
+Respond in this EXACT JSON format — no markdown, no code fences:
+{"headline": "Your headline here", "summary": "Your summary here."}`,
+        },
+        {
+          role: "user",
+          content: `Tweet by ${safeAuthor}:\n\n${safeTweet}`,
+        },
+      ],
+      max_tokens: 300,
+      temperature: 0.7,
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim();
+    if (!raw) throw new Error("Empty response from OpenAI");
+
+    // Parse JSON — strip code fences if the model wraps them anyway
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+    const parsed = JSON.parse(jsonStr);
+
+    const headline: string = (parsed.headline || "").trim();
+    const summary: string = (parsed.summary || "").trim();
+
+    if (!headline) throw new Error("AI returned empty headline");
+
+    console.log(`[McAfee] Tweet → headline: "${headline}"`);
+    console.log(`[McAfee] Tweet → summary: "${summary.slice(0, 80)}..."`);
+
+    return { headline, summary };
+  } catch (error) {
+    console.error("[McAfee] Failed to generate tweet headline/summary:", error);
+    // Fallback: use the tweet text as-is for headline, no summary
+    const fallbackHeadline = tweetText.length > 120
+      ? tweetText.substring(0, 117) + "..."
+      : tweetText;
+    return {
+      headline: fallbackHeadline,
+      summary: `${authorName}${authorHandle ? ` (${authorHandle})` : ""} reported: ${tweetText}`,
+    };
   }
 }

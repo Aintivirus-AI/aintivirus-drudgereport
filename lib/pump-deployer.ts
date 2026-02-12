@@ -17,14 +17,20 @@ import {
   LAMPORTS_PER_SOL,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { Worker } from "worker_threads";
+import os from "os";
 import fs from "fs";
 import path from "path";
 import {
   getConnection,
-  getMasterWallet,
-  getMasterWalletBalance,
   confirmTransactionPolling,
 } from "./solana-wallet";
+import {
+  secureGetWallet,
+  secureGetBalance,
+  checkOperation,
+  logDeployment,
+} from "./secure-wallet";
 import {
   createToken,
   linkTokenToHeadline,
@@ -55,38 +61,139 @@ export async function checkDeploymentBalance(): Promise<{
   hasEnough: boolean;
   balance: number;
 }> {
-  const { sol } = await getMasterWalletBalance();
+  const { sol } = await secureGetBalance("pump-deployer");
   return {
     hasEnough: sol >= MIN_DEPLOYMENT_SOL,
     balance: sol,
   };
 }
 
-/** Generate a vanity keypair whose base58 address ends in "pump".
- *  Brute-forces random keypairs — typically finds a match in 2-5 seconds. */
-function generateMintKeypair(): Keypair {
+/**
+ * Generate a vanity keypair whose base58 address ends in "pump".
+ *
+ * Parallelises the brute-force search across all available CPU cores using
+ * worker_threads.  Each worker independently grinds random keypairs; the first
+ * one to find a match posts its secret key back, and all workers are torn down.
+ *
+ * Probability of a match per attempt: 1/58^4 ≈ 1 in 11.3 M.
+ * With N workers running in parallel the expected wall-clock time drops to
+ * roughly (11.3 M / N) key-generations — typically 5-20 s on a 4-8 core machine
+ * instead of 60-120 s single-threaded.
+ *
+ * A 2-minute hard timeout and a generous per-worker cap ensure we never hang.
+ */
+async function generateMintKeypair(): Promise<Keypair> {
   const SUFFIX = "pump";
-  const MAX_ATTEMPTS = 10_000_000; // safety cap
-  const LOG_INTERVAL = 500_000;
+  const NUM_WORKERS = Math.max(1, Math.min(os.cpus().length, 8));
+  const ATTEMPTS_PER_WORKER = 15_000_000; // 15 M each → up to 120 M total
+  const TIMEOUT_MS = 120_000; // 2-minute hard ceiling
+  const PROGRESS_INTERVAL = 2_000_000;
 
-  console.log(`[PumpDeployer] Grinding for vanity mint address ending in "${SUFFIX}"...`);
+  console.log(
+    `[PumpDeployer] Grinding for vanity mint ending in "${SUFFIX}" ` +
+    `using ${NUM_WORKERS} worker thread(s)…`
+  );
   const start = Date.now();
 
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const kp = Keypair.generate();
-    if (kp.publicKey.toBase58().endsWith(SUFFIX)) {
-      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-      console.log(`[PumpDeployer] Found vanity address in ${elapsed}s after ${i + 1} attempts: ${kp.publicKey.toBase58()}`);
-      return kp;
-    }
-    if (i > 0 && i % LOG_INTERVAL === 0) {
-      console.log(`[PumpDeployer] ...${i.toLocaleString()} attempts so far (${((Date.now() - start) / 1000).toFixed(1)}s)`);
-    }
-  }
+  /* ── inline worker source (CommonJS so Node can eval it directly) ── */
+  const workerSource = `
+    'use strict';
+    const { parentPort, workerData } = require('worker_threads');
+    const { Keypair } = require('@solana/web3.js');
 
-  // Extremely unlikely fallback — use a random address rather than stalling deployment
-  console.warn(`[PumpDeployer] Vanity grind hit ${MAX_ATTEMPTS.toLocaleString()} cap, using random address`);
-  return Keypair.generate();
+    const { suffix, maxAttempts, progressInterval, workerId } = workerData;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      const kp = Keypair.generate();
+      if (kp.publicKey.toBase58().endsWith(suffix)) {
+        parentPort.postMessage({
+          type: 'found',
+          secretKey: Array.from(kp.secretKey),
+          address: kp.publicKey.toBase58(),
+          attempts: i + 1,
+          workerId,
+        });
+        return;                      // let the thread exit gracefully
+      }
+      if (i > 0 && i % progressInterval === 0) {
+        parentPort.postMessage({ type: 'progress', attempts: i, workerId });
+      }
+    }
+    parentPort.postMessage({ type: 'exhausted', attempts: maxAttempts, workerId });
+  `;
+
+  return new Promise<Keypair>((resolve) => {
+    const workers: Worker[] = [];
+    let resolved = false;
+    let finishedCount = 0;
+
+    const finish = (kp: Keypair) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      workers.forEach((w) => { try { w.terminate(); } catch { /* already dead */ } });
+      resolve(kp);
+    };
+
+    // Hard timeout — fall back to a random keypair rather than blocking forever
+    const timer = setTimeout(() => {
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      console.warn(
+        `[PumpDeployer] Vanity grind timed out after ${elapsed}s, using random address`
+      );
+      finish(Keypair.generate());
+    }, TIMEOUT_MS);
+
+    for (let i = 0; i < NUM_WORKERS; i++) {
+      const worker = new Worker(workerSource, {
+        eval: true,
+        workerData: {
+          suffix: SUFFIX,
+          maxAttempts: ATTEMPTS_PER_WORKER,
+          progressInterval: PROGRESS_INTERVAL,
+          workerId: i,
+        },
+      });
+      workers.push(worker);
+
+      worker.on('message', (msg: { type: string; secretKey?: number[]; address?: string; attempts?: number; workerId?: number }) => {
+        if (msg.type === 'found' && !resolved) {
+          const kp = Keypair.fromSecretKey(new Uint8Array(msg.secretKey!));
+          const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+          console.log(
+            `[PumpDeployer] Worker ${msg.workerId} found vanity address in ${elapsed}s ` +
+            `after ${(msg.attempts ?? 0).toLocaleString()} attempts: ${msg.address}`
+          );
+          finish(kp);
+        } else if (msg.type === 'progress') {
+          const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+          console.log(
+            `[PumpDeployer] Worker ${msg.workerId}: ` +
+            `${(msg.attempts ?? 0).toLocaleString()} attempts (${elapsed}s)…`
+          );
+        } else if (msg.type === 'exhausted') {
+          finishedCount++;
+          if (finishedCount >= NUM_WORKERS && !resolved) {
+            console.warn(
+              `[PumpDeployer] All ${NUM_WORKERS} workers exhausted ` +
+              `(${(ATTEMPTS_PER_WORKER * NUM_WORKERS).toLocaleString()} total), ` +
+              `using random address`
+            );
+            finish(Keypair.generate());
+          }
+        }
+      });
+
+      worker.on('error', (err) => {
+        console.error(`[PumpDeployer] Worker ${i} error:`, err);
+        finishedCount++;
+        if (finishedCount >= NUM_WORKERS && !resolved) {
+          console.warn(`[PumpDeployer] All workers errored, using random address`);
+          finish(Keypair.generate());
+        }
+      });
+    }
+  });
 }
 
 /** Download image from URL and convert to Blob for upload.
@@ -353,7 +460,19 @@ export async function deployToken(
 
   try {
     const connection = getConnection();
-    const masterWallet = getMasterWallet();
+    const masterWallet = secureGetWallet("pump-deployer");
+
+    // Pre-flight guardrail check (deployment costs ~0.03 SOL in fees)
+    const guardrailCheck = checkOperation(
+      Math.floor(MIN_DEPLOYMENT_SOL * LAMPORTS_PER_SOL),
+      "pump-deployer"
+    );
+    if (!guardrailCheck.allowed) {
+      return {
+        success: false,
+        error: `Guardrail blocked deployment: ${guardrailCheck.reason}`,
+      };
+    }
 
     // Check balance
     const balanceCheck = await checkDeploymentBalance();
@@ -397,8 +516,8 @@ export async function deployToken(
       persistedBannerUrl = persistedImageUrl;
     }
 
-    // Generate mint keypair
-    const mintKeypair = generateMintKeypair();
+    // Generate mint keypair (parallel vanity grind)
+    const mintKeypair = await generateMintKeypair();
     const mintAddress = mintKeypair.publicKey.toBase58();
     console.log(`[PumpDeployer] Generated mint address: ${mintAddress}`);
 
@@ -478,6 +597,15 @@ export async function deployToken(
       linkTokenToHeadline(tokenRecord.id, headlineId);
     }
 
+    // Audit log the successful deployment
+    logDeployment({
+      caller: "pump-deployer",
+      success: true,
+      mintAddress,
+      txSignature: signature,
+      estimatedCostLamports: Math.floor(MIN_DEPLOYMENT_SOL * LAMPORTS_PER_SOL),
+    });
+
     console.log(`[PumpDeployer] Deployment successful!`);
     console.log(`[PumpDeployer] Mint: ${mintAddress}`);
     console.log(`[PumpDeployer] URL: ${pumpUrl}`);
@@ -490,11 +618,19 @@ export async function deployToken(
       transactionSignature: signature,
     };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown deployment error";
+
+    // Audit log the failed deployment
+    logDeployment({
+      caller: "pump-deployer",
+      success: false,
+      errorMessage,
+    });
+
     console.error("[PumpDeployer] Deployment failed:", error);
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Unknown deployment error",
+      error: errorMessage,
     };
   }
 }
@@ -544,7 +680,7 @@ export async function checkDeploymentConfig(): Promise<{
   const issues: string[] = [];
 
   try {
-    getMasterWallet();
+    secureGetWallet("pump-deployer:config-check");
   } catch (error) {
     issues.push(
       error instanceof Error ? error.message : "Invalid wallet configuration"

@@ -16,6 +16,7 @@
     "scheduler:dev": "tsx watch worker/scheduler.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.988.0",
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.98.0",
     "better-sqlite3": "^11.7.0",
