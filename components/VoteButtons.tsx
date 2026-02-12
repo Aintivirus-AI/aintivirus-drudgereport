@@ -29,8 +29,11 @@ function PostVoteSharePrompt({ voteType, headlineId, title }: { voteType: string
   const shareText = title
     ? `I voted ${voteLabel} on "${title}" — what do you think?\n${siteUrl}`
     : `I voted ${voteLabel}!\n${siteUrl}`;
+  const tgText = title
+    ? `I voted ${voteLabel} on "${title}" — what do you think?`
+    : `I voted ${voteLabel}!`;
   const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
-  const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`;
+  const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(tgText)}`;
 
   return (
     <div className="mt-2 px-3 py-2 rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 text-xs text-gray-300 flex items-center gap-2 flex-wrap animate-fade-in">

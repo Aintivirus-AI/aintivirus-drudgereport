@@ -73,6 +73,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
   tweetLines.push(`\n${articleUrlX}`);
   const tweetText = encodeURIComponent(tweetLines.join(""));
+  // Telegram text without URL (the url param handles it, avoids double-link)
+  const tgLines = [article.title];
+  if (article.token?.ticker && article.token?.pump_url) {
+    tgLines.push(`\n$${article.token.ticker} just launched\n${article.token.pump_url}`);
+  } else if (article.token?.ticker) {
+    tgLines.push(`\n$${article.token.ticker}`);
+  }
+  const tgText = encodeURIComponent(tgLines.join(""));
   const telegramShareUrl = encodeURIComponent(articleUrlTg);
 
   const publishedDate = new Date(article.created_at);
@@ -308,7 +316,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         {/* Social Share */}
         <div className="flex flex-wrap justify-center gap-3 mb-8">
           <a
-            href={`https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(articleUrl)}`}
+            href={`https://twitter.com/intent/tweet?text=${tweetText}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-100 border border-dark-200/50 hover:border-white/30 transition-colors text-sm"
@@ -319,7 +327,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             Share on X
           </a>
           <a
-            href={`https://t.me/share/url?url=${telegramShareUrl}&text=${tweetText}`}
+            href={`https://t.me/share/url?url=${telegramShareUrl}&text=${tgText}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-100 border border-dark-200/50 hover:border-cyan-500/30 transition-colors text-sm"
