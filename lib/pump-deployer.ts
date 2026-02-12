@@ -101,25 +101,27 @@ async function generateMintKeypair(): Promise<Keypair> {
     const { parentPort, workerData } = require('worker_threads');
     const { Keypair } = require('@solana/web3.js');
 
-    const { suffix, maxAttempts, progressInterval, workerId } = workerData;
+    (function () {
+      const { suffix, maxAttempts, progressInterval, workerId } = workerData;
 
-    for (let i = 0; i < maxAttempts; i++) {
-      const kp = Keypair.generate();
-      if (kp.publicKey.toBase58().endsWith(suffix)) {
-        parentPort.postMessage({
-          type: 'found',
-          secretKey: Array.from(kp.secretKey),
-          address: kp.publicKey.toBase58(),
-          attempts: i + 1,
-          workerId,
-        });
-        return;                      // let the thread exit gracefully
+      for (let i = 0; i < maxAttempts; i++) {
+        const kp = Keypair.generate();
+        if (kp.publicKey.toBase58().endsWith(suffix)) {
+          parentPort.postMessage({
+            type: 'found',
+            secretKey: Array.from(kp.secretKey),
+            address: kp.publicKey.toBase58(),
+            attempts: i + 1,
+            workerId,
+          });
+          return;                    // let the thread exit gracefully
+        }
+        if (i > 0 && i % progressInterval === 0) {
+          parentPort.postMessage({ type: 'progress', attempts: i, workerId });
+        }
       }
-      if (i > 0 && i % progressInterval === 0) {
-        parentPort.postMessage({ type: 'progress', attempts: i, workerId });
-      }
-    }
-    parentPort.postMessage({ type: 'exhausted', attempts: maxAttempts, workerId });
+      parentPort.postMessage({ type: 'exhausted', attempts: maxAttempts, workerId });
+    })();
   `;
 
   return new Promise<Keypair>((resolve) => {
