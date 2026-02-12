@@ -157,7 +157,6 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                 ticker={headline.token.ticker}
                 imageUrl={headline.token.image_url}
                 priceChange={headline.token.price_change_24h}
-                showTicker={false}
                 size="sm"
               />
             </span>
