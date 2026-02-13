@@ -82,28 +82,31 @@ async function cmdDryRun(txSignature?: string): Promise<void> {
     return;
   }
 
-  console.log(`Found ${tokens.length} active token(s). Fetching volumes from pump.fun...\n`);
+  const heliusAvailable = !!process.env.HELIUS_API_KEY;
+  const source = heliusAvailable ? "Helius SOL volume" : "pump.fun market cap";
+  console.log(`Found ${tokens.length} active token(s). Fetching activity data (${source})...\n`);
 
   const volumes = await fetchTokenVolumes(tokens);
 
-  // Show volume data
+  // Show activity data
   const volumeRows = volumes.map((v) => {
     const token = tokens.find((t) => t.id === v.tokenId);
     return {
       ticker: token?.ticker || `#${v.tokenId}`,
       mint: v.mintAddress.slice(0, 12) + "…",
-      current: v.currentVolume.toFixed(2),
-      previous: v.previousVolume.toFixed(2),
-      delta: v.volumeDelta.toFixed(2),
+      current: v.currentVolume.toFixed(4),
+      previous: v.previousVolume.toFixed(4),
+      delta: v.volumeDelta.toFixed(4),
     };
   });
 
+  const activityLabel = heliusAvailable ? "SOL Vol" : "Mkt Cap";
   printTable(volumeRows, [
     { key: "ticker", label: "Ticker", width: 12 },
     { key: "mint", label: "Mint", width: 16 },
-    { key: "current", label: "Curr Volume", width: 14 },
-    { key: "previous", label: "Prev Volume", width: 14 },
-    { key: "delta", label: "Delta", width: 14 },
+    { key: "current", label: `Curr ${activityLabel}`, width: 16 },
+    { key: "previous", label: `Prev ${activityLabel}`, width: 16 },
+    { key: "delta", label: "Delta", width: 16 },
   ]);
 
   // Calculate shares with a placeholder amount (1 SOL) to show percentages

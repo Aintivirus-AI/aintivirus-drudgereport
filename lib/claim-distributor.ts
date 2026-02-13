@@ -3,15 +3,23 @@
  *
  * When pump.fun's "Claim" sends a single bulk SOL transfer to the master
  * wallet (with no per-token mint data), this module distributes the SOL
- * fairly across all active tokens based on their relative trading volume.
+ * fairly across all active tokens based on their relative trading activity.
+ *
+ * Strategy: For each token we query Helius for the number of SWAP
+ * transactions on its bonding curve address. Each swap generates a creator
+ * fee, so the trade count (weighted by SOL moved) is the most direct proxy
+ * for fee attribution.  We fall back to pump.fun's `usd_market_cap` if
+ * Helius data is unavailable, since higher-cap tokens typically generated
+ * more trading volume / fees.
  *
  * Flow:
- * 1. Fetch trading volume for every active token via pump.fun API
- * 2. Compute each token's volume delta since the last claim snapshot
- * 3. Split the bulk SOL proportionally (volume-weighted pro-rata)
- * 4. Apply the existing submitter/creator share split (default 50/50)
- * 5. Send each submitter's share via secureSendSol
- * 6. Record everything in claim_batches + claim_allocations for audit
+ * 1. Fetch bonding curve address + market data for every active token
+ * 2. Query Helius for SOL volume per bonding curve (actual trade data)
+ * 3. Compute each token's activity delta since the last claim snapshot
+ * 4. Split the bulk SOL proportionally (activity-weighted pro-rata)
+ * 5. Apply the existing submitter/creator share split (default 50/50)
+ * 6. Send each submitter's share via secureSendSol
+ * 7. Record everything in claim_batches + claim_allocations for audit
  */
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -29,7 +37,7 @@ import {
   saveVolumeSnapshot,
   getTokenById,
 } from "./db";
-import type { Token, ClaimBatch } from "./types";
+import type { Token } from "./types";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -51,6 +59,9 @@ function getSubmitterSharePercent(): number {
 const PUMP_API_V3 = "https://frontend-api-v3.pump.fun/coins";
 const PUMP_API_V1 = "https://frontend-api.pump.fun/coins";
 
+/** Maximum Helius pages to fetch per bonding curve (prevent runaway). */
+const MAX_HELIUS_PAGES = 10;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -58,7 +69,7 @@ const PUMP_API_V1 = "https://frontend-api.pump.fun/coins";
 export interface TokenVolume {
   tokenId: number;
   mintAddress: string;
-  currentVolume: number;      // Cumulative volume from pump.fun API
+  currentVolume: number;      // Cumulative activity metric (SOL volume via Helius, or market cap fallback)
   previousVolume: number;     // Last snapshot (0 if first claim)
   volumeDelta: number;        // currentVolume - previousVolume
 }
@@ -83,20 +94,20 @@ export interface BulkClaimResult {
 }
 
 // ---------------------------------------------------------------------------
-// Pump.fun API — fetch volume per token
+// Pump.fun API — fetch coin data per token
 // ---------------------------------------------------------------------------
 
 interface PumpCoinData {
   mint?: string;
-  total_supply?: number;
+  bonding_curve?: string;
+  associated_bonding_curve?: string;
   usd_market_cap?: number;
-  price?: number;
-  volume_24h?: number;
-  /** Total cumulative trading volume in USD. May be named differently across API versions. */
-  total_volume?: number;
-  cumulative_volume?: number;
-  /** Some API versions use this. */
-  volume?: number;
+  market_cap?: number;
+  real_sol_reserves?: number;
+  real_token_reserves?: number;
+  virtual_sol_reserves?: number;
+  total_supply?: number;
+  complete?: boolean;
 }
 
 /**
@@ -125,33 +136,120 @@ async function fetchPumpCoinData(mintAddress: string): Promise<PumpCoinData | nu
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Helius — fetch actual SOL volume per bonding curve
+// ---------------------------------------------------------------------------
+
 /**
- * Extract the best available cumulative volume figure from pump.fun coin data.
- * Different API versions may use different field names.
+ * Sum the absolute SOL volume flowing through a bonding curve by parsing
+ * Helius enhanced transactions.  Each SWAP transaction's nativeTransfers
+ * that involve the bonding curve represent actual trade volume in SOL.
+ *
+ * Returns cumulative SOL volume in lamports.
  */
-function extractVolume(data: PumpCoinData): number {
-  // Try various field names for cumulative/total volume
-  const vol =
-    data.total_volume ??
-    data.cumulative_volume ??
-    data.volume ??
-    data.volume_24h ??
-    0;
-  return typeof vol === "number" && !isNaN(vol) ? vol : 0;
+async function fetchBondingCurveVolume(
+  bondingCurveAddress: string,
+): Promise<number> {
+  const heliusKey = process.env.HELIUS_API_KEY;
+  if (!heliusKey) return 0;
+
+  let totalVolumeLamports = 0;
+  let beforeSignature: string | undefined;
+
+  for (let page = 0; page < MAX_HELIUS_PAGES; page++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+
+      let url =
+        `https://api.helius.xyz/v0/addresses/${bondingCurveAddress}/transactions` +
+        `?api-key=${heliusKey}&limit=100&type=SWAP`;
+      if (beforeSignature) {
+        url += `&before=${beforeSignature}`;
+      }
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) break;
+
+      const txs = (await response.json()) as Array<{
+        signature: string;
+        nativeTransfers?: Array<{
+          fromUserAccount: string;
+          toUserAccount: string;
+          amount: number;
+        }>;
+      }>;
+
+      if (txs.length === 0) break;
+
+      for (const tx of txs) {
+        if (!tx.nativeTransfers) continue;
+        for (const nt of tx.nativeTransfers) {
+          // SOL flowing INTO the bonding curve = buy
+          if (nt.toUserAccount === bondingCurveAddress) {
+            totalVolumeLamports += nt.amount;
+          }
+          // SOL flowing OUT of the bonding curve = sell
+          if (nt.fromUserAccount === bondingCurveAddress) {
+            totalVolumeLamports += nt.amount;
+          }
+        }
+      }
+
+      // Prepare pagination cursor
+      beforeSignature = txs[txs.length - 1].signature;
+
+      // If fewer than limit, we've reached the end
+      if (txs.length < 100) break;
+
+      // Small delay between pages
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    } catch {
+      break;
+    }
+  }
+
+  return totalVolumeLamports;
 }
 
 /**
- * Fetch trading volumes for all active tokens.
+ * Fetch trading activity metrics for all active tokens.
+ *
+ * Strategy:
+ * 1. Get each token's bonding curve address from pump.fun API
+ * 2. Query Helius for actual SOL volume per bonding curve (most accurate)
+ * 3. If Helius is unavailable, fall back to usd_market_cap as proxy
+ *
  * Returns an array of TokenVolume objects with delta calculation.
  */
 export async function fetchTokenVolumes(tokens: Token[]): Promise<TokenVolume[]> {
   const volumes: TokenVolume[] = [];
+  const heliusAvailable = !!process.env.HELIUS_API_KEY;
+
+  console.log(
+    `[ClaimDistributor] Fetching activity data for ${tokens.length} token(s) ` +
+    `(source: ${heliusAvailable ? "Helius trade history" : "pump.fun market cap fallback"})`
+  );
 
   for (const token of tokens) {
     if (!token.mint_address) continue;
 
-    const data = await fetchPumpCoinData(token.mint_address);
-    const currentVolume = data ? extractVolume(data) : 0;
+    // Step 1: Fetch pump.fun coin data (always needed for bonding curve address)
+    const coinData = await fetchPumpCoinData(token.mint_address);
+
+    let currentVolume = 0;
+
+    if (heliusAvailable && coinData?.bonding_curve) {
+      // Step 2a: Use Helius to get actual SOL volume through the bonding curve
+      const volumeLamports = await fetchBondingCurveVolume(coinData.bonding_curve);
+      // Convert to SOL for a human-readable metric
+      currentVolume = volumeLamports / LAMPORTS_PER_SOL;
+    } else if (coinData) {
+      // Step 2b: Fall back to market cap as proxy
+      currentVolume = coinData.usd_market_cap ?? coinData.market_cap ?? 0;
+    }
 
     // Get previous snapshot for delta calculation
     const lastSnapshot = getLastVolumeSnapshot(token.id);
@@ -166,7 +264,7 @@ export async function fetchTokenVolumes(tokens: Token[]): Promise<TokenVolume[]>
       volumeDelta,
     });
 
-    // Small delay to avoid rate-limiting the pump.fun API
+    // Small delay to avoid rate-limiting
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
