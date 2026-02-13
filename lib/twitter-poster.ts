@@ -273,29 +273,43 @@ export async function tweetArticlePublished(opts: {
     .trim();
 
   // Build the tweet: headline, synopsis, ticker + links
+  // Twitter counts each URL as 23 chars (t.co shortening).
+  // Budget: 280 total - URLs (23 each) - newlines - ticker line
+  const urlCount = (ticker && pumpUrl) ? 2 : 1;
+  const tickerLine = (ticker && pumpUrl) ? `$${ticker} just launched on @pumpfun` : "";
+  const fixedCost = (urlCount * 23) + tickerLine.length + (urlCount + (tickerLine ? 1 : 0) + 1) * 2; // newlines
+  const budgetForText = 280 - fixedCost;
+
   const parts: string[] = [];
 
-  // Headline (truncate if needed, leaving room for the rest)
-  const maxHeadlineLen = synopsis ? 100 : 160;
-  const truncatedHeadline =
-    headline.length > maxHeadlineLen
-      ? headline.substring(0, maxHeadlineLen - 3) + "..."
-      : headline;
-  parts.push(truncatedHeadline);
-
-  // AI synopsis of the event
   if (synopsis) {
-    const maxSynopsisLen = 120;
+    // Split budget: ~60% headline, ~40% synopsis
+    const headlineBudget = Math.floor(budgetForText * 0.6);
+    const synopsisBudget = budgetForText - headlineBudget;
+
+    const truncatedHeadline =
+      headline.length > headlineBudget
+        ? headline.substring(0, headlineBudget - 3) + "..."
+        : headline;
+    parts.push(truncatedHeadline);
+
     const truncatedSynopsis =
-      synopsis.length > maxSynopsisLen
-        ? synopsis.substring(0, maxSynopsisLen - 3) + "..."
+      synopsis.length > synopsisBudget
+        ? synopsis.substring(0, synopsisBudget - 3) + "..."
         : synopsis;
     parts.push(truncatedSynopsis);
+  } else {
+    // No synopsis — give all budget to headline
+    const truncatedHeadline =
+      headline.length > budgetForText
+        ? headline.substring(0, budgetForText - 3) + "..."
+        : headline;
+    parts.push(truncatedHeadline);
   }
 
   // Token launch line + links
   if (ticker && pumpUrl) {
-    parts.push(`$${ticker} just launched on @pumpdotfun`);
+    parts.push(tickerLine);
     parts.push(pumpUrl);
   }
 
