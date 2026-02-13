@@ -141,6 +141,45 @@ export interface CreateRevenueEventRequest {
   amount_lamports: number;
 }
 
+// ============= CLAIM DISTRIBUTION TYPES =============
+
+export type ClaimBatchStatus = "pending" | "distributing" | "completed" | "failed";
+export type ClaimAllocationStatus = "pending" | "paid" | "failed" | "skipped";
+
+/** A bulk claim event from pump.fun (one claim tx = one batch). */
+export interface ClaimBatch {
+  id: number;
+  tx_signature: string;
+  total_lamports: number;
+  tokens_count: number;
+  distributed_lamports: number;
+  status: ClaimBatchStatus;
+  created_at: string;
+}
+
+/** Per-token allocation within a claim batch. */
+export interface ClaimAllocation {
+  id: number;
+  batch_id: number;
+  token_id: number;
+  volume_snapshot: number;
+  share_percent: number;
+  amount_lamports: number;
+  submitter_lamports: number;
+  submitter_tx_signature: string | null;
+  status: ClaimAllocationStatus;
+  created_at: string;
+}
+
+/** Volume snapshot for delta calculation between claims. */
+export interface TokenVolumeSnapshot {
+  id: number;
+  token_id: number;
+  cumulative_volume: number;
+  snapshot_source: string;
+  created_at: string;
+}
+
 // ============= VALIDATION TYPES =============
 
 export interface ValidationResult {

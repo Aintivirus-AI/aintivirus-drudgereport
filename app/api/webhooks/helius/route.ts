@@ -18,12 +18,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getTokenByMintAddress } from "@/lib/db";
 import { recordAndDistributeRevenue } from "@/lib/revenue-distributor";
+import { distributeBulkClaim } from "@/lib/claim-distributor";
 import { safeCompare } from "@/lib/auth";
 
 const MASTER_WALLET = process.env.MASTER_WALLET_PUBLIC_KEY || "";
 
 // Minimum amount to process (avoid dust transactions)
 const MIN_REVENUE_LAMPORTS = 10_000; // 0.00001 SOL
+
+// Threshold for treating an unmatched transfer as a bulk pump.fun claim (configurable)
+const BULK_CLAIM_THRESHOLD = Math.floor(
+  parseFloat(process.env.BULK_CLAIM_THRESHOLD_SOL || "0.01") * LAMPORTS_PER_SOL
+);
 
 // Replay protection: track processed transaction signatures
 const processedSignatures = new Map<string, number>(); // signature → timestamp
@@ -266,9 +272,36 @@ export async function POST(request: NextRequest) {
               distError
             );
           }
+        } else if (transfer.lamports >= BULK_CLAIM_THRESHOLD) {
+          // Likely a pump.fun bulk claim — distribute pro-rata across all tokens
+          console.log(
+            `[HeliusWebhook] Unmatched bulk transfer (${transfer.lamports / LAMPORTS_PER_SOL} SOL), ` +
+            `routing to claim distributor…`
+          );
+          try {
+            const claimResult = await distributeBulkClaim(
+              tx.signature,
+              transfer.lamports
+            );
+            if (claimResult.success) {
+              distributed++;
+              console.log(
+                `[HeliusWebhook] Bulk claim distributed across ${claimResult.tokensCount} token(s)`
+              );
+            } else {
+              console.error(
+                `[HeliusWebhook] Bulk claim distribution failed: ${claimResult.error}`
+              );
+            }
+          } catch (claimError) {
+            console.error(
+              `[HeliusWebhook] Bulk claim distribution error:`,
+              claimError
+            );
+          }
         } else {
           console.log(
-            `[HeliusWebhook] Could not match transfer to a token, skipping`
+            `[HeliusWebhook] Unmatched small transfer (${transfer.lamports / LAMPORTS_PER_SOL} SOL), skipping`
           );
         }
       }

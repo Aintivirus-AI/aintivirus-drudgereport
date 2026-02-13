@@ -16,7 +16,12 @@ import type {
   Vote,
   VoteCounts,
   ActivityEvent,
-  ActivityEventType
+  ActivityEventType,
+  ClaimBatch,
+  ClaimBatchStatus,
+  ClaimAllocation,
+  ClaimAllocationStatus,
+  TokenVolumeSnapshot,
 } from "./types";
 
 // Database path
@@ -153,6 +158,47 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_votes_voter_hash ON votes(voter_hash);
   CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_activity_log_event_type ON activity_log(event_type);
+
+  -- Claim batches: tracks each bulk pump.fun claim event
+  CREATE TABLE IF NOT EXISTS claim_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tx_signature TEXT UNIQUE NOT NULL,
+    total_lamports INTEGER NOT NULL,
+    tokens_count INTEGER NOT NULL,
+    distributed_lamports INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','distributing','completed','failed')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Per-token allocation within a claim batch
+  CREATE TABLE IF NOT EXISTS claim_allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id INTEGER NOT NULL REFERENCES claim_batches(id),
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    volume_snapshot REAL NOT NULL,
+    share_percent REAL NOT NULL,
+    amount_lamports INTEGER NOT NULL,
+    submitter_lamports INTEGER NOT NULL,
+    submitter_tx_signature TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','failed','skipped')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Volume snapshots for delta calculation between claims
+  CREATE TABLE IF NOT EXISTS token_volume_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    cumulative_volume REAL NOT NULL,
+    snapshot_source TEXT DEFAULT 'pump_api',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_claim_batches_status ON claim_batches(status);
+  CREATE INDEX IF NOT EXISTS idx_claim_batches_tx ON claim_batches(tx_signature);
+  CREATE INDEX IF NOT EXISTS idx_claim_allocations_batch ON claim_allocations(batch_id);
+  CREATE INDEX IF NOT EXISTS idx_claim_allocations_token ON claim_allocations(token_id);
+  CREATE INDEX IF NOT EXISTS idx_volume_snapshots_token ON token_volume_snapshots(token_id);
+  CREATE INDEX IF NOT EXISTS idx_volume_snapshots_created ON token_volume_snapshots(created_at DESC);
 `);
 
 // Migration: Add image_url column if it doesn't exist
@@ -1439,6 +1485,219 @@ export function getActivityStats(): {
       ? Math.round((approvalStats.approved / approvalStats.total) * 100)
       : 0,
   };
+}
+
+// ============= CLAIM DISTRIBUTION CRUD =============
+
+/**
+ * Get all active tokens (those with a mint address) for claim distribution.
+ */
+export function getActiveTokensForClaim(): Token[] {
+  const stmt = db.prepare(`
+    SELECT * FROM tokens
+    WHERE mint_address IS NOT NULL
+    ORDER BY created_at ASC
+  `);
+  return stmt.all() as Token[];
+}
+
+/**
+ * Check if a claim batch already exists for a given transaction signature.
+ */
+export function getClaimBatchByTxSignature(txSignature: string): ClaimBatch | undefined {
+  const stmt = db.prepare(`SELECT * FROM claim_batches WHERE tx_signature = ?`);
+  return stmt.get(txSignature) as ClaimBatch | undefined;
+}
+
+/**
+ * Create a new claim batch record.
+ */
+export function createClaimBatch(
+  txSignature: string,
+  totalLamports: number,
+  tokensCount: number
+): ClaimBatch {
+  const stmt = db.prepare(`
+    INSERT INTO claim_batches (tx_signature, total_lamports, tokens_count)
+    VALUES (?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(txSignature, totalLamports, tokensCount) as ClaimBatch;
+}
+
+/**
+ * Update claim batch status and distributed amount.
+ */
+export function updateClaimBatchStatus(
+  id: number,
+  status: ClaimBatchStatus,
+  distributedLamports?: number
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE claim_batches
+    SET status = ?, distributed_lamports = COALESCE(?, distributed_lamports)
+    WHERE id = ?
+  `);
+  const result = stmt.run(status, distributedLamports ?? null, id);
+  return result.changes > 0;
+}
+
+/**
+ * Get claim batch by ID.
+ */
+export function getClaimBatchById(id: number): ClaimBatch | undefined {
+  const stmt = db.prepare(`SELECT * FROM claim_batches WHERE id = ?`);
+  return stmt.get(id) as ClaimBatch | undefined;
+}
+
+/**
+ * Get all claim batches, ordered by newest first.
+ */
+export function getAllClaimBatches(limit: number = 50): ClaimBatch[] {
+  const stmt = db.prepare(`
+    SELECT * FROM claim_batches
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  return stmt.all(limit) as ClaimBatch[];
+}
+
+/**
+ * Get pending claim batches (for retry processing).
+ */
+export function getPendingClaimBatches(): ClaimBatch[] {
+  const stmt = db.prepare(`
+    SELECT * FROM claim_batches
+    WHERE status IN ('pending', 'distributing')
+    ORDER BY created_at ASC
+  `);
+  return stmt.all() as ClaimBatch[];
+}
+
+/**
+ * Create a claim allocation record for a token within a batch.
+ */
+export function createClaimAllocation(
+  batchId: number,
+  tokenId: number,
+  volumeSnapshot: number,
+  sharePercent: number,
+  amountLamports: number,
+  submitterLamports: number
+): ClaimAllocation {
+  const stmt = db.prepare(`
+    INSERT INTO claim_allocations (batch_id, token_id, volume_snapshot, share_percent, amount_lamports, submitter_lamports)
+    VALUES (?, ?, ?, ?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(batchId, tokenId, volumeSnapshot, sharePercent, amountLamports, submitterLamports) as ClaimAllocation;
+}
+
+/**
+ * Update a claim allocation's status and tx signature.
+ */
+export function updateClaimAllocationStatus(
+  id: number,
+  status: ClaimAllocationStatus,
+  submitterTxSignature?: string
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE claim_allocations
+    SET status = ?, submitter_tx_signature = COALESCE(?, submitter_tx_signature)
+    WHERE id = ?
+  `);
+  const result = stmt.run(status, submitterTxSignature ?? null, id);
+  return result.changes > 0;
+}
+
+/**
+ * Get all allocations for a claim batch.
+ */
+export function getClaimAllocationsByBatch(batchId: number): ClaimAllocation[] {
+  const stmt = db.prepare(`
+    SELECT * FROM claim_allocations
+    WHERE batch_id = ?
+    ORDER BY share_percent DESC
+  `);
+  return stmt.all(batchId) as ClaimAllocation[];
+}
+
+/**
+ * Get the most recent volume snapshot for a token.
+ */
+export function getLastVolumeSnapshot(tokenId: number): TokenVolumeSnapshot | undefined {
+  const stmt = db.prepare(`
+    SELECT * FROM token_volume_snapshots
+    WHERE token_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `);
+  return stmt.get(tokenId) as TokenVolumeSnapshot | undefined;
+}
+
+/**
+ * Save a volume snapshot for a token.
+ */
+export function saveVolumeSnapshot(
+  tokenId: number,
+  cumulativeVolume: number,
+  source: string = "pump_api"
+): TokenVolumeSnapshot {
+  const stmt = db.prepare(`
+    INSERT INTO token_volume_snapshots (token_id, cumulative_volume, snapshot_source)
+    VALUES (?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(tokenId, cumulativeVolume, source) as TokenVolumeSnapshot;
+}
+
+/**
+ * Get claim distribution summary for display/reporting.
+ */
+export function getClaimDistributionSummary(batchId: number): Array<{
+  token_id: number;
+  token_name: string;
+  ticker: string;
+  mint_address: string | null;
+  deployer_sol_address: string;
+  volume_snapshot: number;
+  share_percent: number;
+  amount_lamports: number;
+  submitter_lamports: number;
+  submitter_tx_signature: string | null;
+  allocation_status: string;
+}> {
+  const stmt = db.prepare(`
+    SELECT
+      ca.token_id,
+      t.token_name,
+      t.ticker,
+      t.mint_address,
+      t.deployer_sol_address,
+      ca.volume_snapshot,
+      ca.share_percent,
+      ca.amount_lamports,
+      ca.submitter_lamports,
+      ca.submitter_tx_signature,
+      ca.status as allocation_status
+    FROM claim_allocations ca
+    JOIN tokens t ON ca.token_id = t.id
+    WHERE ca.batch_id = ?
+    ORDER BY ca.share_percent DESC
+  `);
+  return stmt.all(batchId) as Array<{
+    token_id: number;
+    token_name: string;
+    ticker: string;
+    mint_address: string | null;
+    deployer_sol_address: string;
+    volume_snapshot: number;
+    share_percent: number;
+    amount_lamports: number;
+    submitter_lamports: number;
+    submitter_tx_signature: string | null;
+    allocation_status: string;
+  }>;
 }
 
 export default db;

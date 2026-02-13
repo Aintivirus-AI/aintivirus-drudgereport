@@ -637,7 +637,13 @@ export async function deployToken(
   }
 }
 
-/** Get token info from pump.fun. */
+// Pump.fun coin data API — v3 (current), v1 (deprecated fallback)
+const PUMP_COIN_API_URLS = [
+  "https://frontend-api-v3.pump.fun/coins",
+  "https://frontend-api.pump.fun/coins",
+];
+
+/** Get token info from pump.fun (tries v3, then v1 fallback). */
 export async function getTokenInfo(
   mintAddress: string
 ): Promise<{
@@ -646,32 +652,36 @@ export async function getTokenInfo(
   marketCap?: number;
   volume24h?: number;
 }> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    let data: Record<string, unknown>;
+  for (const baseUrl of PUMP_COIN_API_URLS) {
     try {
-      const response = await fetch(
-        `https://frontend-api.pump.fun/coins/${mintAddress}`,
-        { signal: controller.signal }
-      );
-      if (!response.ok) return { exists: false };
-      data = await response.json();
-    } finally {
-      clearTimeout(timeout);
-    }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
 
-    return {
-      exists: true,
-      price: data.price as number | undefined,
-      marketCap: data.usd_market_cap as number | undefined,
-      volume24h: data.volume_24h as number | undefined,
-    };
-  } catch (error) {
-    console.error("[PumpDeployer] Error fetching token info:", error);
-    return { exists: false };
+      let data: Record<string, unknown>;
+      try {
+        const response = await fetch(
+          `${baseUrl}/${mintAddress}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) continue; // Try next URL
+        data = await response.json();
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      return {
+        exists: true,
+        price: data.price as number | undefined,
+        marketCap: data.usd_market_cap as number | undefined,
+        volume24h: data.volume_24h as number | undefined,
+      };
+    } catch {
+      // Try next URL
+    }
   }
+
+  console.error(`[PumpDeployer] Error fetching token info for ${mintAddress} from all API endpoints`);
+  return { exists: false };
 }
 
 /** Deployment configuration check. */
