@@ -724,6 +724,22 @@ export function getPendingSubmissionsCount(): number {
 }
 
 /**
+ * Purge stale submissions older than the given hours.
+ * Removes pending, validating, and approved submissions that have been
+ * sitting in the queue too long. Published and rejected are left alone.
+ * Returns the number of rows deleted.
+ */
+export function purgeStaleSubmissions(olderThanHours: number = 72): number {
+  const stmt = db.prepare(`
+    DELETE FROM submissions
+    WHERE status IN ('pending', 'validating', 'approved')
+      AND created_at < datetime('now', '-' || ? || ' hours')
+  `);
+  const result = stmt.run(olderThanHours);
+  return result.changes;
+}
+
+/**
  * Get submission count by status (efficient COUNT query).
  */
 export function getSubmissionCountByStatus(status: SubmissionStatus): number {

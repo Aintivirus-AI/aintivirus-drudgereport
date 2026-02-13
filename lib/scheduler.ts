@@ -22,6 +22,7 @@ import {
   updateHeadlineMcAfeeTake,
   updateHeadlineSummary,
   detectContentType,
+  purgeStaleSubmissions,
 } from "./db";
 import { validateSubmission, smartFetchContent } from "./ai-validator";
 import { generateTokenMetadata } from "./token-generator";
@@ -568,6 +569,12 @@ export async function runSchedulerCycle(): Promise<{
 }> {
   console.log("[Scheduler] Starting scheduler cycle...");
   console.log(`[Scheduler] Status: ${JSON.stringify(getSchedulerStatus())}`);
+
+  // Auto-purge stale submissions older than 72 hours
+  const purged = purgeStaleSubmissions(72);
+  if (purged > 0) {
+    console.log(`[Scheduler] Purged ${purged} stale submission(s) older than 72h`);
+  }
 
   const validated = await processValidationQueue();
   const published = await publishApprovedBatch();

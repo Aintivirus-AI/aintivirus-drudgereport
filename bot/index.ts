@@ -46,6 +46,7 @@ import {
   updateHeadlineSummary,
   getSetting,
   setSetting,
+  purgeStaleSubmissions,
 } from "../lib/db";
 import { generateMcAfeeTake, scoreHeadlineImportance, generateCoinSummary } from "../lib/mcafee-commentator";
 
@@ -1074,6 +1075,29 @@ bot.command("removeuser", async (ctx) => {
     console.error("Error removing from whitelist:", error);
     await ctx.reply("Failed to remove user.");
   }
+});
+
+// /purge (admin) — remove stale pending/approved submissions older than N hours
+bot.command("purge", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId || !isAdmin(userId)) {
+    await ctx.reply("Admin only.");
+    return;
+  }
+
+  const args = ctx.message?.text?.split(" ").slice(1);
+  const hours = parseInt(args?.[0] || "72", 10);
+
+  if (isNaN(hours) || hours < 1) {
+    await ctx.reply("Usage: `/purge [hours]`\nDefault: 72 hours", { parse_mode: "Markdown" });
+    return;
+  }
+
+  const deleted = purgeStaleSubmissions(hours);
+  await ctx.reply(
+    `Purged *${deleted}* stale submission(s) older than ${hours} hours.\n(pending, validating, and approved only — published/rejected are kept)`,
+    { parse_mode: "Markdown" }
+  );
 });
 
 // /mayhem (admin) — toggle pump.fun Mayhem Mode
