@@ -44,6 +44,8 @@ import {
   updateHeadlineImportanceScore,
   updateHeadlineMcAfeeTake,
   updateHeadlineSummary,
+  getSetting,
+  setSetting,
 } from "../lib/db";
 import { generateMcAfeeTake, scoreHeadlineImportance, generateCoinSummary } from "../lib/mcafee-commentator";
 
@@ -1071,6 +1073,36 @@ bot.command("removeuser", async (ctx) => {
   } catch (error) {
     console.error("Error removing from whitelist:", error);
     await ctx.reply("Failed to remove user.");
+  }
+});
+
+// /mayhem (admin) — toggle pump.fun Mayhem Mode
+bot.command("mayhem", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId || !isAdmin(userId)) {
+    await ctx.reply("Admin only.");
+    return;
+  }
+
+  const args = ctx.message?.text?.split(" ").slice(1);
+  const action = args?.[0]?.toLowerCase();
+
+  if (action === "on") {
+    setSetting("mayhem_mode", "on");
+    await ctx.reply("Mayhem Mode *ENABLED*\n\nNew token deployments will use pump.fun create\\_v2 with Mayhem Mode.", {
+      parse_mode: "Markdown",
+    });
+  } else if (action === "off") {
+    setSetting("mayhem_mode", "off");
+    await ctx.reply("Mayhem Mode *DISABLED*\n\nToken deployments will use standard mode.", {
+      parse_mode: "Markdown",
+    });
+  } else {
+    const current = getSetting("mayhem_mode") === "on";
+    await ctx.reply(
+      `*Mayhem Mode:* ${current ? "ON" : "OFF"}\n\nUsage: \`/mayhem on\` or \`/mayhem off\``,
+      { parse_mode: "Markdown" }
+    );
   }
 });
 

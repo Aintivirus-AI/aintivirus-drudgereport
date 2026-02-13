@@ -199,6 +199,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_claim_allocations_token ON claim_allocations(token_id);
   CREATE INDEX IF NOT EXISTS idx_volume_snapshots_token ON token_volume_snapshots(token_id);
   CREATE INDEX IF NOT EXISTS idx_volume_snapshots_created ON token_volume_snapshots(created_at DESC);
+
+  -- Comments on articles
+  CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    headline_id INTEGER NOT NULL REFERENCES headlines(id),
+    telegram_user_id TEXT NOT NULL,
+    telegram_username TEXT,
+    telegram_first_name TEXT,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_comments_headline ON comments(headline_id, created_at DESC);
+
+  -- App-wide settings (key-value store for admin toggles)
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Migration: Add image_url column if it doesn't exist
@@ -1698,6 +1717,112 @@ export function getClaimDistributionSummary(batchId: number): Array<{
     submitter_tx_signature: string | null;
     allocation_status: string;
   }>;
+}
+
+// ============= COMMENTS =============
+
+export interface CommentRow {
+  id: number;
+  headline_id: number;
+  telegram_user_id: string;
+  telegram_username: string | null;
+  telegram_first_name: string | null;
+  content: string;
+  created_at: string;
+}
+
+/**
+ * Get comments for a headline, newest first.
+ */
+export function getComments(headlineId: number, limit: number = 50): CommentRow[] {
+  const stmt = db.prepare(`
+    SELECT * FROM comments
+    WHERE headline_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  return stmt.all(headlineId, limit) as CommentRow[];
+}
+
+/**
+ * Add a comment to a headline.
+ */
+export function addComment(
+  headlineId: number,
+  telegramUserId: string,
+  content: string,
+  telegramUsername?: string,
+  telegramFirstName?: string
+): CommentRow {
+  const stmt = db.prepare(`
+    INSERT INTO comments (headline_id, telegram_user_id, telegram_username, telegram_first_name, content)
+    VALUES (?, ?, ?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(headlineId, telegramUserId, telegramUsername || null, telegramFirstName || null, content) as CommentRow;
+}
+
+// ============= SETTINGS =============
+
+/**
+ * Get a setting value by key. Returns null if not set.
+ */
+export function getSetting(key: string): string | null {
+  const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+/**
+ * Set a setting value (upsert).
+ */
+export function setSetting(key: string, value: string): void {
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `).run(key, value);
+}
+
+// ============= TOP EARNERS =============
+
+export interface TopEarner {
+  telegram_username: string | null;
+  telegram_user_id: string;
+  sol_address: string;
+  total_earned_lamports: number;
+  revenue_events_count: number;
+}
+
+/**
+ * Get top earners by SOL earned, with an optional time period filter.
+ * @param period - 'day' | 'week' | 'month' | 'all'
+ */
+export function getTopEarners(period: string = "all", limit: number = 15): TopEarner[] {
+  let dateFilter = "";
+  if (period === "day") {
+    dateFilter = "AND re.created_at >= datetime('now', '-1 day')";
+  } else if (period === "week") {
+    dateFilter = "AND re.created_at >= datetime('now', '-7 days')";
+  } else if (period === "month") {
+    dateFilter = "AND re.created_at >= datetime('now', '-30 days')";
+  }
+
+  const stmt = db.prepare(`
+    SELECT
+      s.telegram_username,
+      s.telegram_user_id,
+      s.sol_address,
+      SUM(re.submitter_share_lamports) as total_earned_lamports,
+      COUNT(DISTINCT re.id) as revenue_events_count
+    FROM revenue_events re
+    JOIN tokens t ON re.token_id = t.id
+    JOIN submissions s ON t.submission_id = s.id
+    WHERE re.status IN ('submitter_paid', 'completed')
+      ${dateFilter}
+    GROUP BY s.telegram_user_id
+    ORDER BY total_earned_lamports DESC
+    LIMIT ?
+  `);
+  return stmt.all(limit) as TopEarner[];
 }
 
 export default db;

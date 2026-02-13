@@ -1,11 +1,9 @@
 /**
  * Scheduler worker process.
  *
- * Dynamic scheduling (safety-net timer — primary trigger is event-driven):
- * - Adjusts interval based on queue depth:
- *     > 10 items →  2 min (sprint mode)
- *     > 0  items →  5 min (active)
- *     0 items    → 10 min (idle)
+ * Fixed 10-minute cadence:
+ * - Publishes 1 approved article every 10 minutes (6/hour, 144/day)
+ * - Validates up to 10 pending submissions per cycle
  * - Revenue processing runs on a fixed 5-minute cron (independent)
  *
  * Other features:
@@ -46,23 +44,20 @@ let isProcessingRevenue = false;
 let cycleCount = 0;
 let isShuttingDown = false;
 
-// Store timers/tasks for cleanup
-let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
+// Store cron tasks for cleanup
 const cronTasks: ScheduledTask[] = [];
 
 // Dynamically imported module references (loaded in main after env is ready)
 let runSchedulerCycle: typeof import("../lib/scheduler")["runSchedulerCycle"];
 let getSchedulerStatus: typeof import("../lib/scheduler")["getSchedulerStatus"];
-let getNextIntervalMs: typeof import("../lib/scheduler")["getNextIntervalMs"];
 let processPendingRevenue: typeof import("../lib/revenue-distributor")["processPendingRevenue"];
 
 /**
- * Run a scheduler cycle, then schedule the next one based on queue depth.
+ * Run a scheduler cycle (called every 10 minutes by cron).
  */
 async function safeRunCycle(): Promise<void> {
   if (isRunning || isShuttingDown) {
     console.log("[Worker] Scheduler cycle already running or shutting down, skipping...");
-    scheduleNextCycle(); // Still need to schedule the next one
     return;
   }
 
@@ -89,34 +84,6 @@ async function safeRunCycle(): Promise<void> {
   } finally {
     isRunning = false;
   }
-
-  // Schedule the next cycle (interval adapts to queue depth)
-  scheduleNextCycle();
-}
-
-/**
- * Schedule the next scheduler cycle based on current queue depth.
- */
-function scheduleNextCycle(): void {
-  if (isShuttingDown) return;
-
-  // Clear any existing timer
-  if (schedulerTimer) {
-    clearTimeout(schedulerTimer);
-    schedulerTimer = null;
-  }
-
-  const intervalMs = getNextIntervalMs();
-  const intervalMin = Math.round(intervalMs / 60_000);
-  const status = getSchedulerStatus();
-
-  console.log(
-    `[Worker] Next cycle in ${intervalMin} min ` +
-    `(queue: ${status.queueDepth} = ${status.pendingCount} pending + ` +
-    `${status.approvedCount} approved + ${status.validatingCount} validating)`
-  );
-
-  schedulerTimer = setTimeout(() => safeRunCycle(), intervalMs);
 }
 
 /**
@@ -151,14 +118,19 @@ async function main(): Promise<void> {
 
   runSchedulerCycle = scheduler.runSchedulerCycle;
   getSchedulerStatus = scheduler.getSchedulerStatus;
-  getNextIntervalMs = scheduler.getNextIntervalMs;
   processPendingRevenue = revenue.processPendingRevenue;
 
   console.log("🚀 Starting News Token Scheduler Worker");
   console.log(`📊 Initial status: ${JSON.stringify(getSchedulerStatus())}`);
 
-  // Run immediately on startup, which will also schedule the next cycle
+  // Run immediately on startup
   await safeRunCycle();
+
+  // Fixed 10-minute publishing cycle: 1 article per cycle = 6/hour, 144/day
+  const publishingTask = cron.schedule("*/10 * * * *", async () => {
+    await safeRunCycle();
+  });
+  cronTasks.push(publishingTask);
 
   // Revenue processing stays on a fixed 5-minute cron (independent of publishing)
   const revenueTask = cron.schedule("*/5 * * * *", async () => {
@@ -167,7 +139,7 @@ async function main(): Promise<void> {
   cronTasks.push(revenueTask);
 
   console.log("⏰ Scheduler started:");
-  console.log("   - Publishing:  event-driven + safety-net timer (2/5/10 min based on queue depth)");
+  console.log("   - Publishing:  every 10 minutes (6/hour, 144/day)");
   console.log("   - Revenue:     every 5 minutes");
   console.log("   Press Ctrl+C to stop\n");
 
@@ -178,13 +150,9 @@ async function main(): Promise<void> {
 
     console.log(`\n👋 Received ${signal}, shutting down scheduler...`);
 
-    // Stop cron jobs and timers from scheduling new work
+    // Stop cron jobs from scheduling new work
     for (const task of cronTasks) {
       task.stop();
-    }
-    if (schedulerTimer) {
-      clearTimeout(schedulerTimer);
-      schedulerTimer = null;
     }
 
     // Wait for in-progress work (max 30 seconds)

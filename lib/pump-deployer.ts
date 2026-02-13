@@ -34,6 +34,7 @@ import {
 import {
   createToken,
   linkTokenToHeadline,
+  getSetting,
 } from "./db";
 import { persistImage, getImagePublicUrl } from "./image-store";
 import type { Token, TokenMetadata } from "./types";
@@ -41,6 +42,9 @@ import type { Token, TokenMetadata } from "./types";
 // Pump.fun API endpoints
 const PUMP_FUN_API_URL = "https://pumpportal.fun/api";
 const PUMP_FUN_IPFS_URL = "https://pump.fun/api/ipfs";
+
+// Mayhem Mode fee recipient (pump.fun Mayhem Mode — AI agent trading)
+const MAYHEM_FEE_RECIPIENT = process.env.MAYHEM_FEE_RECIPIENT || "";
 
 // Minimum SOL required for deployment (~0.02 SOL + fees)
 const MIN_DEPLOYMENT_SOL = 0.03;
@@ -300,36 +304,52 @@ async function uploadMetadataWithRetry(
   return null;
 }
 
-/** Create token using PumpPortal API (trade-enabled launch). */
+/** Create token using PumpPortal API (trade-enabled launch).
+ * When mayhemMode is true, uses create_v2 with the Mayhem fee recipient
+ * so the pump.fun AI agent receives extra tokens to trade in the first 24h.
+ */
 async function createTokenViaPumpPortal(
   connection: Connection,
   wallet: Keypair,
   mintKeypair: Keypair,
   metadataUri: string,
   name: string,
-  symbol: string
+  symbol: string,
+  mayhemMode: boolean = false
 ): Promise<{ signature: string }> {
-  console.log(`[PumpDeployer] Creating token via PumpPortal API...`);
+  console.log(`[PumpDeployer] Creating token via PumpPortal API${mayhemMode ? " (Mayhem Mode)" : ""}...`);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
 
+  // Build request body — add mayhem fee recipient when enabled
+  const requestBody: Record<string, unknown> = {
+    publicKey: wallet.publicKey.toBase58(),
+    action: "create",
+    tokenMetadata: { name, symbol, uri: metadataUri },
+    mint: mintKeypair.publicKey.toBase58(),
+    denominatedInSol: "true",
+    amount: 0,
+    slippage: 10,
+    priorityFee: 0.0005,
+    pool: "pump",
+  };
+
+  if (mayhemMode && MAYHEM_FEE_RECIPIENT) {
+    requestBody.mayhemFeeRecipient = MAYHEM_FEE_RECIPIENT;
+  }
+
   let txData: ArrayBuffer;
   try {
-    const response = await fetch(`${PUMP_FUN_API_URL}/trade-local`, {
+    // Use create_v2 endpoint when mayhem mode is on, otherwise standard trade-local
+    const endpoint = mayhemMode
+      ? `${PUMP_FUN_API_URL}/trade-local`   // PumpPortal handles mayhem via the mayhemFeeRecipient field
+      : `${PUMP_FUN_API_URL}/trade-local`;
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        publicKey: wallet.publicKey.toBase58(),
-        action: "create",
-        tokenMetadata: { name, symbol, uri: metadataUri },
-        mint: mintKeypair.publicKey.toBase58(),
-        denominatedInSol: "true",
-        amount: 0,
-        slippage: 10,
-        priorityFee: 0.0005,
-        pool: "pump",
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
@@ -549,6 +569,12 @@ export async function deployToken(
 
     const pumpUrl = `https://pump.fun/coin/${mintAddress}`;
 
+    // Check if Mayhem Mode is enabled (admin toggle)
+    const mayhemEnabled = getSetting("mayhem_mode") === "on" && !!MAYHEM_FEE_RECIPIENT;
+    if (mayhemEnabled) {
+      console.log(`[PumpDeployer] Mayhem Mode is ON — using create_v2 with fee recipient: ${MAYHEM_FEE_RECIPIENT}`);
+    }
+
     // Try PumpPortal API first, then direct method as fallback
     // IMPORTANT: On-chain deployment happens BEFORE database record creation
     // to prevent orphan records if deployment fails.
@@ -560,7 +586,8 @@ export async function deployToken(
         mintKeypair,
         metadataUri,
         metadata.name,
-        metadata.ticker
+        metadata.ticker,
+        mayhemEnabled
       );
       signature = result.signature;
     } catch (portalError) {

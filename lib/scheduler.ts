@@ -36,9 +36,10 @@ import type { Submission, PageContent } from "./types";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // Configuration
-const MAX_ARTICLES_PER_DAY = 72;
-const VALIDATION_BATCH_SIZE = 10;  // validate up to 10 per cycle (was 5)
-const PUBLISH_BATCH_SIZE = 3;      // publish up to 3 per cycle (was 1)
+// 6 per hour × 24 hours = 144 daily max
+const MAX_ARTICLES_PER_DAY = 144;
+const VALIDATION_BATCH_SIZE = 10;  // validate up to 10 per cycle
+const PUBLISH_BATCH_SIZE = 1;      // publish 1 per cycle (every 10 minutes = 6/hour)
 
 /**
  * Process the validation queue – validate pending submissions.
@@ -549,23 +550,11 @@ export function getSchedulerStatus(): {
 }
 
 /**
- * Determine the optimal interval (in ms) until the next cycle
- * based on current queue depth.
- *
- * These intervals are a safety net — the primary trigger is now
- * event-driven (bot fires HTTP POST on each submission). The timer
- * catches anything that slips through.
- *
- *   queueDepth > 10  →   2 minutes (sprint mode)
- *   queueDepth > 0   →   5 minutes (active)
- *   queueDepth == 0  →  10 minutes (idle)
+ * Fixed 10-minute interval between cycles.
+ * Publishes 1 article per cycle = 6 per hour, 144 per day.
  */
 export function getNextIntervalMs(): number {
-  const { queueDepth } = getSchedulerStatus();
-
-  if (queueDepth > 10) return 2 * 60 * 1000;   //  2 min
-  if (queueDepth > 0)  return 5 * 60 * 1000;    //  5 min
-  return 10 * 60 * 1000;                         // 10 min
+  return 10 * 60 * 1000; // Fixed 10 minutes
 }
 
 /**

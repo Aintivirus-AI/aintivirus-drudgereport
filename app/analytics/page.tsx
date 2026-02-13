@@ -5,6 +5,7 @@ import { SubmitCTA } from "@/components/SubmitCTA";
 import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { SentimentMeter } from "@/components/SentimentMeter";
 import { WarRoomFeed } from "@/components/WarRoomFeed";
+import { TopEarners } from "@/components/TopEarners";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const revalidate = 30;
@@ -56,7 +57,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Leaderboard Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Top Submitters */}
           <div>
             <h2 className="text-lg font-semibold text-neon-cyan border-b border-dark-200/30 pb-2 mb-4">
@@ -165,6 +166,11 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Top Earners */}
+          <div>
+            <TopEarners />
           </div>
         </div>
 

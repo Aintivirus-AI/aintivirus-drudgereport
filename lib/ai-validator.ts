@@ -29,10 +29,9 @@ const DUPLICATE_THRESHOLD_CERTAIN = 0.82; // Auto-duplicate, no AI needed
 const DUPLICATE_THRESHOLD_MAYBE = 0.65; // "Maybe" zone — ask AI to confirm
 
 // Maximum age in hours for news submissions
-// Configurable via env var; default 24h covers syndicated news, time-zone
-// differences, and ongoing/developing stories that are still very much current.
+// Configurable via env var; default 6h keeps the feed fresh and timely.
 const MAX_NEWS_AGE_HOURS = parseInt(
-  process.env.MAX_NEWS_AGE_HOURS || "24",
+  process.env.MAX_NEWS_AGE_HOURS || "6",
   10
 );
 

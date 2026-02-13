@@ -5,6 +5,7 @@ import { TokenTicker } from "@/components/TokenTicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
 import { getSidebarHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
+import { MayhemBanner } from "@/components/MayhemBanner";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -18,6 +19,9 @@ export default function Home() {
   return (
     <main className="main-content">
       <div className="grid-bg min-h-screen">
+        {/* Mayhem Mode indicator */}
+        <MayhemBanner />
+
         {/* Breaking News Siren */}
         <BreakingSiren headline={breakingHeadline || null} />
 

@@ -11,6 +11,7 @@ import { VoteButtons } from "@/components/VoteButtons";
 import { SubmitCTA } from "@/components/SubmitCTA";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArticleChat } from "@/components/ArticleChat";
+import { CommentSection } from "@/components/CommentSection";
 
 export const revalidate = 30;
 
@@ -339,6 +340,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </a>
           <CopyLinkButton url={articleUrl} />
         </div>
+
+        {/* Comments */}
+        <CommentSection headlineId={article.id} />
 
         {/* Related Articles — prevents dead-end user journeys */}
         {(() => {

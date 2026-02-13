@@ -12,12 +12,22 @@ interface HeadlineLinkProps {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
+// X/Twitter logo SVG for tweet headlines without images
+const XLogo = () => (
+  <div className="w-full h-full flex items-center justify-center bg-dark-100 rounded">
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-gray-400">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+  </div>
+);
+
 export function HeadlineLink({ headline }: HeadlineLinkProps) {
   const articlePath = `/article/${headline.id}`;
   const articleUrl = `${SITE_URL}${articlePath}`;
+  const isTweet = headline.url.includes("twitter.com") || headline.url.includes("x.com");
 
-  // If there's an image, show a card-style layout
-  if (headline.image_url) {
+  // If there's an image OR it's a tweet (show X logo), use card-style layout
+  if (headline.image_url || isTweet) {
     const isCotdCard = headline.title.startsWith("Coin Of The Day:");
 
     return (
@@ -30,14 +40,18 @@ export function HeadlineLink({ headline }: HeadlineLinkProps) {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Image
-                  src={headline.image_url}
-                  alt={headline.title}
-                  width={64}
-                  height={64}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
-                  loading="lazy"
-                />
+                {headline.image_url ? (
+                  <Image
+                    src={headline.image_url}
+                    alt={headline.title}
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                    loading="lazy"
+                  />
+                ) : (
+                  <XLogo />
+                )}
               </a>
               {/* Token badge overlay on image */}
               {headline.token && (

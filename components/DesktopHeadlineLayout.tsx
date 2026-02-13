@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { Headline, MainHeadlineData } from "@/lib/types";
 import { HeadlineColumn } from "./HeadlineColumn";
 import { MainHeadline } from "./MainHeadline";
 
 type SortMode = "popular" | "trending" | "recent";
+const SORT_STORAGE_KEY = "headline_sort_mode";
 
 /** Trending score: votes weighted by recency (HN-style gravity) */
 function trendingScore(h: Headline): number {
   const ageHours = (Date.now() - new Date(h.created_at).getTime()) / 3_600_000;
   return (h.wagmi_count + 1) / Math.pow(ageHours + 2, 1.5);
+}
+
+function getInitialSort(): SortMode {
+  if (typeof window === "undefined") return "popular";
+  const saved = localStorage.getItem(SORT_STORAGE_KEY);
+  if (saved === "popular" || saved === "trending" || saved === "recent") return saved;
+  return "popular";
 }
 
 interface DesktopHeadlineLayoutProps {
@@ -23,6 +31,16 @@ export function DesktopHeadlineLayout({
   mainHeadline,
 }: DesktopHeadlineLayoutProps) {
   const [sortMode, setSortMode] = useState<SortMode>("popular");
+
+  // Restore persisted sort mode on mount (SSR-safe)
+  useEffect(() => {
+    setSortMode(getInitialSort());
+  }, []);
+
+  // Persist sort mode when it changes
+  useEffect(() => {
+    localStorage.setItem(SORT_STORAGE_KEY, sortMode);
+  }, [sortMode]);
 
   const sorted = useMemo(() => {
     if (sortMode === "recent") {
