@@ -44,8 +44,14 @@ import type { Token } from "./types";
 // Configuration
 // ---------------------------------------------------------------------------
 
-/** SOL to fund ephemeral wallet for claim + sweep transaction fees. */
-const CLAIM_FUND_LAMPORTS = Math.floor(0.002 * LAMPORTS_PER_SOL);
+/**
+ * SOL to fund ephemeral wallet for claim + sweep transaction fees.
+ * Must cover: token account rent-exempt minimum (2,039,280 lamports)
+ * + claim tx fee (~5,000) + sweep tx fee (~5,000) + priority fees buffer.
+ * 0.002 SOL was insufficient — the collectCreatorFee instruction creates
+ * a token account that requires ~0.00204 SOL in rent.
+ */
+const CLAIM_FUND_LAMPORTS = Math.floor(0.003 * LAMPORTS_PER_SOL);
 
 /** Minimum net revenue (after fees) to trigger distribution. */
 const MIN_CLAIM_REVENUE_LAMPORTS = Math.floor(0.001 * LAMPORTS_PER_SOL);
