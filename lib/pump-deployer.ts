@@ -16,6 +16,8 @@ import {
   PublicKey,
   LAMPORTS_PER_SOL,
   VersionedTransaction,
+  Transaction,
+  SystemProgram,
 } from "@solana/web3.js";
 import { Worker } from "worker_threads";
 import os from "os";
@@ -49,6 +51,9 @@ const MAYHEM_FEE_RECIPIENT = process.env.MAYHEM_FEE_RECIPIENT || "";
 // Minimum SOL required for deployment (~0.02 SOL + fees)
 const MIN_DEPLOYMENT_SOL = 0.03;
 
+// Funding amount for ephemeral deployer wallet (deployment cost + buffer for sweep-back fee)
+const EPHEMERAL_FUND_SOL = 0.035;
+
 /** Token deployment result */
 export interface DeploymentResult {
   success: boolean;
@@ -67,7 +72,7 @@ export async function checkDeploymentBalance(): Promise<{
 }> {
   const { sol } = await secureGetBalance("pump-deployer");
   return {
-    hasEnough: sol >= MIN_DEPLOYMENT_SOL,
+    hasEnough: sol >= EPHEMERAL_FUND_SOL,
     balance: sol,
   };
 }
@@ -467,6 +472,102 @@ async function createTokenDirect(
 }
 
 /**
+ * Fund an ephemeral wallet from the master wallet.
+ * Direct SOL transfer — bypasses send guardrails since this is an
+ * internal operation (the deployment already has its own checkOperation guard).
+ */
+async function fundEphemeralWallet(
+  connection: Connection,
+  masterWallet: Keypair,
+  ephemeralWallet: Keypair,
+  lamports: number
+): Promise<string> {
+  const tx = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: masterWallet.publicKey,
+      toPubkey: ephemeralWallet.publicKey,
+      lamports,
+    })
+  );
+
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("confirmed");
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = masterWallet.publicKey;
+  tx.sign(masterWallet);
+
+  const signature = await connection.sendRawTransaction(tx.serialize(), {
+    skipPreflight: false,
+    preflightCommitment: "confirmed",
+  });
+
+  await confirmTransactionPolling(
+    connection,
+    signature,
+    blockhash,
+    lastValidBlockHeight,
+    "confirmed"
+  );
+
+  return signature;
+}
+
+/**
+ * Sweep remaining SOL from an ephemeral wallet back to the master wallet.
+ * Best-effort — logs warnings but never throws.
+ */
+async function sweepEphemeralWallet(
+  connection: Connection,
+  ephemeralWallet: Keypair,
+  masterPublicKey: PublicKey
+): Promise<void> {
+  try {
+    const balance = await connection.getBalance(ephemeralWallet.publicKey);
+    const fee = 5_000; // ~0.000005 SOL standard transaction fee
+    const sweepAmount = balance - fee;
+
+    if (sweepAmount <= 0) {
+      console.log(`[PumpDeployer] Ephemeral wallet empty, nothing to sweep`);
+      return;
+    }
+
+    const tx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: ephemeralWallet.publicKey,
+        toPubkey: masterPublicKey,
+        lamports: sweepAmount,
+      })
+    );
+
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = ephemeralWallet.publicKey;
+    tx.sign(ephemeralWallet);
+
+    const signature = await connection.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+
+    await confirmTransactionPolling(
+      connection,
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+      "confirmed"
+    );
+
+    console.log(
+      `[PumpDeployer] Swept ${(sweepAmount / LAMPORTS_PER_SOL).toFixed(6)} SOL ` +
+        `back to master wallet (tx: ${signature})`
+    );
+  } catch (error) {
+    console.warn(`[PumpDeployer] Failed to sweep ephemeral wallet:`, error);
+  }
+}
+
+/**
  * Deploy a new token on pump.fun.
  */
 export async function deployToken(
@@ -480,13 +581,18 @@ export async function deployToken(
     `[PumpDeployer] Starting deployment for "${metadata.name}" (${metadata.ticker})`
   );
 
-  try {
-    const connection = getConnection();
-    const masterWallet = secureGetWallet("pump-deployer");
+  // Hoisted for catch-block cleanup access (ephemeral wallet sweep)
+  let connection!: Connection;
+  let masterWallet!: Keypair;
+  let ephemeralWallet: Keypair | null = null;
 
-    // Pre-flight guardrail check (deployment costs ~0.03 SOL in fees)
+  try {
+    connection = getConnection();
+    masterWallet = secureGetWallet("pump-deployer");
+
+    // Pre-flight guardrail check (deployment + ephemeral wallet funding)
     const guardrailCheck = checkOperation(
-      Math.floor(MIN_DEPLOYMENT_SOL * LAMPORTS_PER_SOL),
+      Math.floor(EPHEMERAL_FUND_SOL * LAMPORTS_PER_SOL),
       "pump-deployer"
     );
     if (!guardrailCheck.allowed) {
@@ -496,16 +602,33 @@ export async function deployToken(
       };
     }
 
-    // Check balance
+    // Check balance (master wallet needs enough to fund ephemeral deployer)
     const balanceCheck = await checkDeploymentBalance();
     if (!balanceCheck.hasEnough) {
       return {
         success: false,
-        error: `Insufficient balance: ${balanceCheck.balance} SOL (need ${MIN_DEPLOYMENT_SOL} SOL)`,
+        error: `Insufficient balance: ${balanceCheck.balance} SOL (need ${EPHEMERAL_FUND_SOL} SOL)`,
       };
     }
 
     console.log(`[PumpDeployer] Wallet balance: ${balanceCheck.balance} SOL`);
+
+    // Create ephemeral deployer wallet (unique address for every deployment)
+    ephemeralWallet = Keypair.generate();
+    console.log(
+      `[PumpDeployer] Ephemeral deployer: ${ephemeralWallet.publicKey.toBase58()}`
+    );
+
+    // Fund ephemeral wallet from master wallet
+    const fundSig = await fundEphemeralWallet(
+      connection,
+      masterWallet,
+      ephemeralWallet,
+      Math.floor(EPHEMERAL_FUND_SOL * LAMPORTS_PER_SOL)
+    );
+    console.log(
+      `[PumpDeployer] Funded ephemeral wallet with ${EPHEMERAL_FUND_SOL} SOL (tx: ${fundSig})`
+    );
 
     // Persist the token logo to permanent storage (used on the site)
     let persistedImageUrl = metadata.imageUrl;
@@ -561,6 +684,7 @@ export async function deployToken(
     );
 
     if (!metadataUri) {
+      await sweepEphemeralWallet(connection, ephemeralWallet, masterWallet.publicKey);
       return {
         success: false,
         error: "Failed to upload token metadata after multiple attempts",
@@ -582,7 +706,7 @@ export async function deployToken(
     try {
       const result = await createTokenViaPumpPortal(
         connection,
-        masterWallet,
+        ephemeralWallet,
         mintKeypair,
         metadataUri,
         metadata.name,
@@ -597,7 +721,7 @@ export async function deployToken(
       );
       const result = await createTokenDirect(
         connection,
-        masterWallet,
+        ephemeralWallet,
         mintKeypair,
         metadata.name,
         metadata.ticker,
@@ -605,6 +729,9 @@ export async function deployToken(
       );
       signature = result.signature;
     }
+
+    // Sweep remaining SOL from ephemeral wallet back to master
+    await sweepEphemeralWallet(connection, ephemeralWallet, masterWallet.publicKey);
 
     // Create token record in database AFTER on-chain success
     // (prevents orphan records when deployment fails)
@@ -648,6 +775,11 @@ export async function deployToken(
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown deployment error";
+
+    // Sweep ephemeral wallet if it was funded before the failure
+    if (ephemeralWallet) {
+      await sweepEphemeralWallet(connection, ephemeralWallet, masterWallet.publicKey);
+    }
 
     // Audit log the failed deployment
     logDeployment({
