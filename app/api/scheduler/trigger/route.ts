@@ -5,6 +5,7 @@ import {
   publishApprovedBatch,
   getSchedulerStatus,
 } from "@/lib/scheduler";
+import { claimAllCreatorFees } from "@/lib/creator-fee-claimer";
 import { isAuthenticated } from "@/lib/auth";
 
 // Debounce: track last validation trigger time to prevent rapid-fire calls.
@@ -20,7 +21,7 @@ let lastValidateTriggerMs = 0;
  * submission (event-driven) and can also be triggered manually.
  *
  * Query params / JSON body:
- *   action: "cycle" (default) | "validate" | "publish" | "status"
+ *   action: "cycle" (default) | "validate" | "publish" | "claim-fees" | "status"
  *
  * Auth: x-api-key header ONLY (query param auth removed — keys in URLs leak in logs)
  *
@@ -89,6 +90,25 @@ export async function POST(request: NextRequest) {
             : "No approved submissions to publish",
           published: published.map(s => ({ id: s.id, url: s.url, status: s.status })),
           status,
+        });
+      }
+
+      case "claim-fees": {
+        console.log("[API] Manual trigger: claim creator fees");
+        const claimResult = await claimAllCreatorFees();
+        const claimStatus = getSchedulerStatus();
+        return NextResponse.json({
+          success: true,
+          action: "claim-fees",
+          message: claimResult.claimed > 0
+            ? `Claimed fees from ${claimResult.claimed} token(s), ${(claimResult.totalClaimedLamports / 1e9).toFixed(6)} SOL total`
+            : `Processed ${claimResult.processed} token(s), no fees to claim`,
+          processed: claimResult.processed,
+          claimed: claimResult.claimed,
+          failed: claimResult.failed,
+          totalClaimedSol: claimResult.totalClaimedLamports / 1e9,
+          results: claimResult.results,
+          status: claimStatus,
         });
       }
 

@@ -152,8 +152,10 @@ async function main(): Promise<void> {
   console.log("🚀 Starting News Token Scheduler Worker");
   console.log(`📊 Initial status: ${JSON.stringify(getSchedulerStatus())}`);
 
-  // Run immediately on startup
+  // Run all jobs immediately on startup (don't wait for first cron tick)
   await safeRunCycle();
+  safeProcessRevenue().catch(() => {});
+  safeClaimCreatorFees().catch(() => {});
 
   // Fixed 10-minute publishing cycle: 1 article per cycle = 6/hour, 144/day
   const publishingTask = cron.schedule("*/10 * * * *", async () => {
