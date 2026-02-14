@@ -18,7 +18,8 @@ db.exec(`
     timestamp   DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     operation   TEXT NOT NULL CHECK(operation IN (
       'send_sol', 'deploy_token', 'buy_burn', 'burn_tokens',
-      'balance_check', 'wallet_access', 'guardrail_block'
+      'balance_check', 'wallet_access', 'guardrail_block',
+      'claim_creator_fee'
     )),
     amount_lamports INTEGER DEFAULT 0,
     destination     TEXT,
@@ -35,6 +36,52 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_wallet_audit_operation
     ON wallet_audit_log(operation);
 `);
+
+// Migration: Recreate wallet_audit_log if the CHECK constraint is missing
+// 'claim_creator_fee'. SQLite doesn't support ALTER COLUMN, so we must
+// recreate the table and copy data across.
+{
+  const tableInfo = db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='wallet_audit_log'"
+    )
+    .get() as { sql: string } | undefined;
+
+  if (tableInfo && !tableInfo.sql.includes("claim_creator_fee")) {
+    db.exec(`
+      CREATE TABLE wallet_audit_log_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp   DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        operation   TEXT NOT NULL CHECK(operation IN (
+          'send_sol', 'deploy_token', 'buy_burn', 'burn_tokens',
+          'balance_check', 'wallet_access', 'guardrail_block',
+          'claim_creator_fee'
+        )),
+        amount_lamports INTEGER DEFAULT 0,
+        destination     TEXT,
+        tx_signature    TEXT,
+        caller          TEXT NOT NULL,
+        success         INTEGER NOT NULL DEFAULT 1,
+        error_message   TEXT,
+        metadata        TEXT
+      );
+
+      INSERT INTO wallet_audit_log_new
+        SELECT * FROM wallet_audit_log;
+
+      DROP TABLE wallet_audit_log;
+
+      ALTER TABLE wallet_audit_log_new RENAME TO wallet_audit_log;
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_audit_timestamp
+        ON wallet_audit_log(timestamp);
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_audit_operation
+        ON wallet_audit_log(operation);
+    `);
+    console.log("[WalletAudit] Migrated CHECK constraint to include claim_creator_fee");
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Types
