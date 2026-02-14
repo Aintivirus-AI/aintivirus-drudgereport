@@ -40,13 +40,38 @@ Rules:
 - Do not be harmful, discriminatory, or explicitly illegal in your commentary`;
 
 /**
+ * Theme-specific hints that steer McAfee's voice to match the token's meme theme.
+ * When a theme is provided, McAfee leans into that energy for cohesion.
+ */
+const THEME_HINTS: Record<string, string> = {
+  "absurdist-weird":
+    "\n\nThe token for this headline has an ABSURDIST theme — lean into surreal, dreamlike, nonsensical humor. Say something that makes no sense but feels profound. Channel your weirdest energy.",
+  "cutely-relatable":
+    "\n\nThe token for this headline has a CUTE/RELATABLE theme — show a rare vulnerable side. Be surprisingly tender or empathetic, like even McAfee's ghost has feelings sometimes. But keep the edge.",
+  "aggressively-political":
+    "\n\nThe token for this headline has an AGGRESSIVELY POLITICAL theme — go MAXIMUM heat. Name names. Take the spiciest possible side. This is your most unhinged political rant energy.",
+  "post-ironic":
+    "\n\nThe token for this headline has a POST-IRONIC theme — be meta and self-aware. Comment on the absurdity of the crypto space itself. Multiple layers of irony. You know this is all a simulation.",
+  "cursed-energy":
+    "\n\nThe token for this headline has a CURSED theme — say something unsettling and wrong. The kind of thing that makes people screenshot and say 'what did McAfee's ghost just say.' Creepy but funny.",
+  "unhinged-conspiracy":
+    "\n\nThe token for this headline has a CONSPIRACY theme — this is YOUR territory. Connect it to a bigger conspiracy. Everything is connected. You were right all along. Go full paranoid genius mode.",
+  "rage-bait":
+    "\n\nThe token for this headline has a RAGE BAIT theme — say the thing that will make people FURIOUS. Maximum provocation. The take that gets quote-tweeted 10K times by angry people.",
+  "nostalgia-corrupted":
+    "\n\nThe token for this headline has a NOSTALGIA theme — reference pop culture, movies, memes, or shared cultural moments. Corrupt a familiar reference with your McAfee spin.",
+};
+
+/**
  * Generate a McAfee-style hot take for a headline.
  * @param positive — if true, forces a bullish/positive tone (used for COTD)
+ * @param themeHint — optional meme theme ID to steer McAfee's voice
  */
 export async function generateMcAfeeTake(
   headline: string,
   content: PageContent,
-  positive = false
+  positive = false,
+  themeHint?: string
 ): Promise<string> {
   const safeHeadline = sanitizeForPrompt(headline, 200);
   const safeDescription = content.description
@@ -57,11 +82,15 @@ export async function generateMcAfeeTake(
     ? "\n\nIMPORTANT: This is a featured Coin of the Day. Be enthusiastic and bullish. Hype it up — make people excited about this project. Never be negative or dismissive."
     : "";
 
+  const themeInstruction = themeHint && THEME_HINTS[themeHint]
+    ? THEME_HINTS[themeHint]
+    : "";
+
   try {
     const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: MCAFEE_SYSTEM_PROMPT + positiveHint },
+        { role: "system", content: MCAFEE_SYSTEM_PROMPT + positiveHint + themeInstruction },
         {
           role: "user",
           content: `Give your hot take on this headline:\n\nHeadline: ${safeHeadline}\n${safeDescription ? `Context: ${safeDescription}` : ""}`,
@@ -76,7 +105,7 @@ export async function generateMcAfeeTake(
       throw new Error("Empty response from OpenAI");
     }
 
-    console.log(`[McAfee] Generated take: "${take}"`);
+    console.log(`[McAfee] Generated take: "${take}"${themeHint ? ` [${themeHint}]` : ""}`);
     return take;
   } catch (error) {
     console.error("[McAfee] Failed to generate take:", error);

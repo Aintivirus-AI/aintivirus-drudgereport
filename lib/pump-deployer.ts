@@ -746,7 +746,8 @@ export async function deployToken(
       submissionId,
       persistedImageUrl,
       mintAddress,
-      pumpUrl
+      pumpUrl,
+      metadata.theme
     );
 
     console.log(`[PumpDeployer] Created token record #${tokenRecord.id}`);

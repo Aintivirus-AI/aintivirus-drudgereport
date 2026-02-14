@@ -112,6 +112,8 @@ export interface Token {
   creator_wallet_encrypted_key: string | null;
   /** ISO timestamp of the last successful creator-fee claim for this token. */
   last_fee_claim_at: string | null;
+  /** The meme theme ID used when generating this token (for analytics). */
+  theme: string | null;
   created_at: string;
 }
 
@@ -212,6 +214,29 @@ export interface TokenMetadata {
   imageUrl: string;
   bannerUrl: string;
   description: string;
+  /** The meme theme ID used to generate this token (for analytics). */
+  theme?: string;
+}
+
+// ============= MEME THEME TYPES =============
+
+export interface MemeTheme {
+  /** Unique identifier for this theme. */
+  id: string;
+  /** Human-readable name. */
+  name: string;
+  /** Prompt instructions for generating the token name. */
+  namePrompt: string;
+  /** Prompt instructions for generating the ticker. */
+  tickerPrompt: string;
+  /** Few-shot examples showing headline -> name / ticker. */
+  examples: string;
+  /** Art style / visual direction for logo and banner generation. */
+  artStyle: string;
+  /** Tone instructions for the token description / synopsis. */
+  descriptionTone: string;
+  /** Optional weight for weighted random selection (default 1). */
+  weight?: number;
 }
 
 // ============= VOTE TYPES =============

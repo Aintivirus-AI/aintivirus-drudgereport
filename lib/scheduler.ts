@@ -345,39 +345,22 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       }
     }
 
-    // Generate AI importance score + McAfee commentary in parallel with token generation
-    const aiEnrichmentPromise = (async () => {
-      try {
-        const [importanceScore, mcafeeTake] = await Promise.all([
-          scoreHeadlineImportance(headline, content),
-          generateMcAfeeTake(headline, content),
-        ]);
-
-        updateHeadlineImportanceScore(headlineRecord.id, importanceScore);
-        updateHeadlineMcAfeeTake(headlineRecord.id, mcafeeTake);
-
-        console.log(
-          `[Scheduler] AI enrichment for #${headlineRecord.id}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`
-        );
-      } catch (aiError) {
-        console.warn(`[Scheduler] AI enrichment failed (non-fatal):`, aiError);
-      }
-    })();
-
-    // Generate token metadata and deploy
+    // Generate token metadata first (picks a meme theme) then deploy + enrich
     let deployedTicker: string | undefined;
     let deployedPumpUrl: string | undefined;
     let deployedDescription: string | undefined;
     let deployedImageUrl: string | undefined;
+    let selectedTheme: string | undefined;
 
     try {
       console.log(
         `[Scheduler] Generating token metadata for headline #${headlineRecord.id}`
       );
       const tokenMetadata = await generateTokenMetadata(headline, content);
+      selectedTheme = tokenMetadata.theme;
 
       console.log(
-        `[Scheduler] Deploying token: ${tokenMetadata.name} (${tokenMetadata.ticker})`
+        `[Scheduler] Deploying token: ${tokenMetadata.name} (${tokenMetadata.ticker}) [theme: ${selectedTheme}]`
       );
       const deployResult = await deployToken(
         tokenMetadata,
@@ -409,8 +392,22 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       );
     }
 
-    // Wait for AI enrichment to complete before marking as published
-    await aiEnrichmentPromise;
+    // Generate AI importance score + McAfee commentary (with theme hint from token)
+    try {
+      const [importanceScore, mcafeeTake] = await Promise.all([
+        scoreHeadlineImportance(headline, content),
+        generateMcAfeeTake(headline, content, false, selectedTheme),
+      ]);
+
+      updateHeadlineImportanceScore(headlineRecord.id, importanceScore);
+      updateHeadlineMcAfeeTake(headlineRecord.id, mcafeeTake);
+
+      console.log(
+        `[Scheduler] AI enrichment for #${headlineRecord.id}: importance=${importanceScore}, take="${mcafeeTake.slice(0, 50)}..."`
+      );
+    } catch (aiError) {
+      console.warn(`[Scheduler] AI enrichment failed (non-fatal):`, aiError);
+    }
 
     // Mark as published
     markSubmissionPublished(submission.id);

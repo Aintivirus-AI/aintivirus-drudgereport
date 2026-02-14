@@ -277,6 +277,11 @@ try {
 } catch {
   // Column already exists
 }
+try {
+  db.exec(`ALTER TABLE tokens ADD COLUMN theme TEXT`);
+} catch {
+  // Column already exists
+}
 
 // Insert default main headline if none exists
 const mainHeadlineExists = db
@@ -1010,11 +1015,12 @@ export function createToken(
   submissionId?: number,
   imageUrl?: string,
   mintAddress?: string,
-  pumpUrl?: string
+  pumpUrl?: string,
+  theme?: string
 ): Token {
   const stmt = db.prepare(`
-    INSERT INTO tokens (headline_id, submission_id, token_name, ticker, image_url, mint_address, pump_url, deployer_sol_address)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tokens (headline_id, submission_id, token_name, ticker, image_url, mint_address, pump_url, deployer_sol_address, theme)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING *
   `);
   return stmt.get(
@@ -1025,7 +1031,8 @@ export function createToken(
     imageUrl || null,
     mintAddress || null,
     pumpUrl || null,
-    deployerSolAddress
+    deployerSolAddress,
+    theme || null
   ) as Token;
 }
 
