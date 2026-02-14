@@ -45,13 +45,15 @@ import type { Token } from "./types";
 // ---------------------------------------------------------------------------
 
 /**
- * SOL to fund ephemeral wallet for claim + sweep transaction fees.
+ * Target balance for ephemeral wallet before claiming.
  * Must cover: token account rent-exempt minimum (2,039,280 lamports)
- * + claim tx fee (~5,000) + sweep tx fee (~5,000) + priority fees buffer.
- * 0.002 SOL was insufficient — the collectCreatorFee instruction creates
- * a token account that requires ~0.00204 SOL in rent.
+ * + claim tx fee (~5,000) + sweep tx fee (~5,000) + priority fees + buffer.
+ *
+ * We top the wallet UP to this amount (accounting for any pre-existing balance
+ * from previous failed runs) rather than always sending a fixed amount.
+ * 0.005 SOL gives generous headroom for ATA rent + multi-instruction fees.
  */
-const CLAIM_FUND_LAMPORTS = Math.floor(0.003 * LAMPORTS_PER_SOL);
+const CLAIM_TARGET_BALANCE_LAMPORTS = Math.floor(0.005 * LAMPORTS_PER_SOL);
 
 /** Minimum net revenue (after fees) to trigger distribution. */
 const MIN_CLAIM_REVENUE_LAMPORTS = Math.floor(0.001 * LAMPORTS_PER_SOL);
@@ -271,8 +273,8 @@ async function claimAndSweep(
   const tokenLabel = `${token.ticker} (#${token.id})`;
   console.log(`[FeeClaimer] Claiming fees for ${tokenLabel}...`);
 
-  // Pre-flight guardrail check
-  const guardrailCheck = checkOperation(CLAIM_FUND_LAMPORTS, "fee-claimer");
+  // Pre-flight guardrail check (worst case: full target amount)
+  const guardrailCheck = checkOperation(CLAIM_TARGET_BALANCE_LAMPORTS, "fee-claimer");
   if (!guardrailCheck.allowed) {
     return {
       tokenId: token.id,
@@ -282,9 +284,10 @@ async function claimAndSweep(
     };
   }
 
-  // Step 1: Fund ephemeral wallet for transaction fees
+  // Step 1: Top up ephemeral wallet to target balance (accounts for leftover from previous runs)
+  let fundedAmount = 0;
   try {
-    await fundForClaim(connection, masterWallet, ephemeralKeypair.publicKey);
+    fundedAmount = await fundForClaim(connection, masterWallet, ephemeralKeypair.publicKey);
   } catch (fundError) {
     return {
       tokenId: token.id,
@@ -335,8 +338,9 @@ async function claimAndSweep(
   }
 
   // Step 3: Check balance and calculate net revenue
+  // Net revenue = current balance - what we funded (anything extra is claimed fees)
   const balanceAfterClaim = await connection.getBalance(ephemeralKeypair.publicKey);
-  const netRevenue = balanceAfterClaim - CLAIM_FUND_LAMPORTS;
+  const netRevenue = balanceAfterClaim - fundedAmount;
 
   // Step 4: Sweep all SOL back to master wallet
   await safeSweep(connection, ephemeralKeypair, masterWallet.publicKey);
@@ -395,18 +399,35 @@ async function claimAndSweep(
 // ---------------------------------------------------------------------------
 
 /**
- * Fund an ephemeral wallet with a small amount for claim + sweep transaction fees.
+ * Top up an ephemeral wallet to the target balance for claim + sweep fees.
+ * Checks the wallet's current balance and only sends the delta needed.
+ * Returns the total balance after funding (used to calculate net revenue).
  */
 async function fundForClaim(
   connection: Connection,
   masterWallet: Keypair,
   ephemeralPublicKey: PublicKey
-): Promise<string> {
+): Promise<number> {
+  const currentBalance = await connection.getBalance(ephemeralPublicKey);
+  const needed = CLAIM_TARGET_BALANCE_LAMPORTS - currentBalance;
+
+  if (needed <= 0) {
+    console.log(
+      `[FeeClaimer] Ephemeral wallet already has ${currentBalance / LAMPORTS_PER_SOL} SOL, ` +
+      `no top-up needed (target: ${CLAIM_TARGET_BALANCE_LAMPORTS / LAMPORTS_PER_SOL} SOL)`
+    );
+    return currentBalance;
+  }
+
+  console.log(
+    `[FeeClaimer] Topping up ephemeral wallet: ${currentBalance} → ${CLAIM_TARGET_BALANCE_LAMPORTS} lamports (+${needed})`
+  );
+
   const tx = new Transaction().add(
     SystemProgram.transfer({
       fromPubkey: masterWallet.publicKey,
       toPubkey: ephemeralPublicKey,
-      lamports: CLAIM_FUND_LAMPORTS,
+      lamports: needed,
     })
   );
 
@@ -429,7 +450,7 @@ async function fundForClaim(
     "confirmed"
   );
 
-  return signature;
+  return CLAIM_TARGET_BALANCE_LAMPORTS;
 }
 
 /**
