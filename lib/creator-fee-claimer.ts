@@ -300,21 +300,37 @@ async function claimAndSweep(
     claimSignature = await callCollectCreatorFee(connection, ephemeralKeypair);
     console.log(`[FeeClaimer] ${tokenLabel}: claim tx ${claimSignature}`);
   } catch (claimError) {
-    // Claim failed — sweep back the funding and continue
+    const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
+
+    // Sweep the funding SOL back regardless
     console.warn(
       `[FeeClaimer] ${tokenLabel}: claim failed, sweeping funding back:`,
-      claimError instanceof Error ? claimError.message : claimError
+      errMsg
     );
     await safeSweep(connection, ephemeralKeypair, masterWallet.publicKey);
 
-    // Still update the timestamp so we don't retry immediately
-    updateFeeClaimTimestamp(token.id);
+    // Distinguish between "PumpPortal says no fees" vs infrastructure errors.
+    // 400/500 from PumpPortal → no fees to claim → update timestamp to avoid hammering.
+    // Simulation failures, timeouts, etc. → our problem → DON'T update timestamp so
+    // the token gets retried on the next cycle after we fix the issue.
+    const isNoFeesResponse = errMsg.includes("400") || errMsg.includes("500") || errMsg.includes("No fees");
 
+    if (isNoFeesResponse) {
+      updateFeeClaimTimestamp(token.id);
+      return {
+        tokenId: token.id,
+        ticker: token.ticker,
+        success: true, // Not a hard failure — just no fees available
+        claimedLamports: 0,
+      };
+    }
+
+    // Infrastructure error — don't update timestamp, report as failure
     return {
       tokenId: token.id,
       ticker: token.ticker,
-      success: true, // Not a hard failure — just no fees available
-      claimedLamports: 0,
+      success: false,
+      error: errMsg,
     };
   }
 

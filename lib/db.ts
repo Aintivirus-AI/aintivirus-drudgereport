@@ -1167,6 +1167,21 @@ export function updateFeeClaimTimestamp(tokenId: number): boolean {
 }
 
 /**
+ * Reset fee claim timestamps for all tokens so they become eligible immediately.
+ * Useful after fixing infrastructure issues that caused false "no fees" cooldowns.
+ * Returns the number of tokens reset.
+ */
+export function resetFeeClaimTimestamps(): number {
+  const stmt = db.prepare(`
+    UPDATE tokens SET last_fee_claim_at = NULL
+    WHERE creator_wallet_encrypted_key IS NOT NULL
+      AND mint_address IS NOT NULL
+  `);
+  const result = stmt.run();
+  return result.changes;
+}
+
+/**
  * Check if a Solana address belongs to a known ephemeral deployer wallet.
  * Used by the Helius webhook to skip internal sweep transactions.
  */

@@ -6,6 +6,7 @@ import {
   getSchedulerStatus,
 } from "@/lib/scheduler";
 import { claimAllCreatorFees } from "@/lib/creator-fee-claimer";
+import { resetFeeClaimTimestamps } from "@/lib/db";
 import { isAuthenticated } from "@/lib/auth";
 
 // Debounce: track last validation trigger time to prevent rapid-fire calls.
@@ -21,7 +22,7 @@ let lastValidateTriggerMs = 0;
  * submission (event-driven) and can also be triggered manually.
  *
  * Query params / JSON body:
- *   action: "cycle" (default) | "validate" | "publish" | "claim-fees" | "status"
+ *   action: "cycle" (default) | "validate" | "publish" | "claim-fees" | "reset-fee-timers" | "status"
  *
  * Auth: x-api-key header ONLY (query param auth removed — keys in URLs leak in logs)
  *
@@ -109,6 +110,17 @@ export async function POST(request: NextRequest) {
           totalClaimedSol: claimResult.totalClaimedLamports / 1e9,
           results: claimResult.results,
           status: claimStatus,
+        });
+      }
+
+      case "reset-fee-timers": {
+        console.log("[API] Manual trigger: reset fee claim timestamps");
+        const resetCount = resetFeeClaimTimestamps();
+        return NextResponse.json({
+          success: true,
+          action: "reset-fee-timers",
+          message: `Reset ${resetCount} token(s) — all now eligible for fee claiming`,
+          tokensReset: resetCount,
         });
       }
 
