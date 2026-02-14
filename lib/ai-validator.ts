@@ -670,7 +670,9 @@ function extractContentFromHtml(html: string): PageContent {
     html.match(
       /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i
     );
-  const imageUrl = ogImageMatch ? ogImageMatch[1].trim() : null;
+  const imageUrl = ogImageMatch
+    ? decodeHtmlEntities(ogImageMatch[1].trim())
+    : null;
 
   // Extract both published and modified times — use the MOST RECENT one.
   // News aggregators (Yahoo, MSN, etc.) syndicate stories from Reuters/AP.
@@ -880,6 +882,7 @@ const GARBAGE_TITLE_PATTERNS = [
   /^subscribe\s*to\s*continue/i,
   /^sign\s*in/i,
   /^log\s*in/i,
+  /^x\s*\/\s*\?$/i, // X.com JS-only shell page: "X / ?"
 ];
 
 /**
@@ -1151,17 +1154,23 @@ export async function fetchTwitterContent(url: string): Promise<PageContent> {
       ? `${authorName} (${authorHandle}): ${tweetText}`.substring(0, 300)
       : tweetText.substring(0, 300);
 
-    // Try to get tweet image and date from the page OG tags as fallback.
-    // Twitter/X pages often include article:published_time or og:updated_time
-    // meta tags that the oEmbed API doesn't expose.
+    // Try a single lightweight fetch with social-crawler headers to grab the
+    // OG image / date.  We intentionally do NOT call fetchPageContent() here
+    // because X.com always returns a JS-only shell, which causes all 4
+    // fallback strategies to fire and flood the logs with useless warnings.
     let imageUrl: string | null = null;
     let publishedAt: Date | undefined;
     try {
-      const pageContent = await fetchPageContent(url);
-      imageUrl = pageContent.imageUrl;
-      publishedAt = pageContent.publishedAt;
+      const html = await safeFetchText(url, {
+        headers: SOCIAL_CRAWLER_HEADERS,
+        timeoutMs: 6_000,
+        maxBytes: 512 * 1024, // 512 KB is plenty for meta tags
+      });
+      const ogResult = extractContentFromHtml(html);
+      imageUrl = ogResult.imageUrl;
+      publishedAt = ogResult.publishedAt;
     } catch {
-      // OG fetch is best-effort
+      // OG fetch is best-effort — silence is fine here
     }
 
     return {
