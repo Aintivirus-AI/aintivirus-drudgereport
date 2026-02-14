@@ -89,30 +89,26 @@ async function fetchFromAWS(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Expected format for MASTER_WALLET_ENCRYPTED_KEY:
- *   <hex-iv>:<hex-authTag>:<hex-ciphertext>
+ * Decrypt an AES-256-GCM encrypted string.
  *
- * WALLET_ENCRYPTION_KEY must be a 64-char hex string (32 bytes).
+ * @param encrypted  - Format: `<hex-iv>:<hex-authTag>:<hex-ciphertext>`
+ * @param encryptionKeyHex - 64-character hex string (32 bytes)
+ * @returns The decrypted plaintext (UTF-8).
  */
-function decryptFromEnv(): string {
-  const encryptedKey = process.env.MASTER_WALLET_ENCRYPTED_KEY;
-  const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
-
-  if (!encryptedKey) {
+export function decryptPrivateKey(
+  encrypted: string,
+  encryptionKeyHex: string
+): string {
+  if (!encryptionKeyHex || encryptionKeyHex.length !== 64) {
     throw new Error(
-      "MASTER_WALLET_ENCRYPTED_KEY env var is required when WALLET_SECRET_PROVIDER=encrypted"
-    );
-  }
-  if (!encryptionKey || encryptionKey.length !== 64) {
-    throw new Error(
-      "WALLET_ENCRYPTION_KEY must be a 64-character hex string (32 bytes) when WALLET_SECRET_PROVIDER=encrypted"
+      "Encryption key must be a 64-character hex string (32 bytes)"
     );
   }
 
-  const parts = encryptedKey.split(":");
+  const parts = encrypted.split(":");
   if (parts.length !== 3) {
     throw new Error(
-      "MASTER_WALLET_ENCRYPTED_KEY must be in format <hex-iv>:<hex-authTag>:<hex-ciphertext>"
+      "Encrypted value must be in format <hex-iv>:<hex-authTag>:<hex-ciphertext>"
     );
   }
 
@@ -120,7 +116,7 @@ function decryptFromEnv(): string {
   const iv = Buffer.from(ivHex, "hex");
   const authTag = Buffer.from(authTagHex, "hex");
   const ciphertext = Buffer.from(ciphertextHex, "hex");
-  const key = Buffer.from(encryptionKey, "hex");
+  const key = Buffer.from(encryptionKeyHex, "hex");
 
   const decipher = createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(authTag);
@@ -131,6 +127,23 @@ function decryptFromEnv(): string {
   ]);
 
   return decrypted.toString("utf-8");
+}
+
+/**
+ * Decrypt the master wallet key from environment variables.
+ * Delegates to the generic decryptPrivateKey() with env-sourced values.
+ */
+function decryptFromEnv(): string {
+  const encryptedKey = process.env.MASTER_WALLET_ENCRYPTED_KEY;
+  const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
+
+  if (!encryptedKey) {
+    throw new Error(
+      "MASTER_WALLET_ENCRYPTED_KEY env var is required when WALLET_SECRET_PROVIDER=encrypted"
+    );
+  }
+
+  return decryptPrivateKey(encryptedKey, encryptionKey || "");
 }
 
 // ---------------------------------------------------------------------------

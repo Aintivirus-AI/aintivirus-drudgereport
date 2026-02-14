@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getTokenByMintAddress } from "@/lib/db";
+import { getTokenByMintAddress, isKnownCreatorWallet } from "@/lib/db";
 import { recordAndDistributeRevenue } from "@/lib/revenue-distributor";
 import { distributeBulkClaim } from "@/lib/claim-distributor";
 import { safeCompare } from "@/lib/auth";
@@ -238,6 +238,15 @@ export async function POST(request: NextRequest) {
       const transfers = extractIncomingTransfers(tx);
 
       for (const transfer of transfers) {
+        // Skip internal sweeps from ephemeral deployer wallets
+        // (these are handled by the creator-fee-claimer, not the webhook)
+        if (isKnownCreatorWallet(transfer.fromAddress)) {
+          console.log(
+            `[HeliusWebhook] Skipping internal sweep from deployer wallet ${transfer.fromAddress.slice(0, 8)}…`
+          );
+          continue;
+        }
+
         console.log(
           `[HeliusWebhook] Incoming: ${transfer.lamports / LAMPORTS_PER_SOL} SOL`
         );

@@ -261,6 +261,22 @@ try {
 } catch {
   // Column already exists
 }
+// Migration: Add ephemeral deployer wallet columns to tokens
+try {
+  db.exec(`ALTER TABLE tokens ADD COLUMN creator_wallet_address TEXT`);
+} catch {
+  // Column already exists
+}
+try {
+  db.exec(`ALTER TABLE tokens ADD COLUMN creator_wallet_encrypted_key TEXT`);
+} catch {
+  // Column already exists
+}
+try {
+  db.exec(`ALTER TABLE tokens ADD COLUMN last_fee_claim_at DATETIME`);
+} catch {
+  // Column already exists
+}
 
 // Insert default main headline if none exists
 const mainHeadlineExists = db
@@ -1092,6 +1108,66 @@ export function tickerExists(ticker: string): boolean {
   const stmt = db.prepare(`SELECT COUNT(*) as count FROM tokens WHERE ticker = ?`);
   const result = stmt.get(ticker) as { count: number };
   return result.count > 0;
+}
+
+// ============= EPHEMERAL DEPLOYER WALLET CRUD =============
+
+/**
+ * Store the encrypted ephemeral deployer key for a token.
+ * Called after successful on-chain deployment.
+ */
+export function saveCreatorWalletKey(
+  tokenId: number,
+  walletAddress: string,
+  encryptedKey: string
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE tokens
+    SET creator_wallet_address = ?, creator_wallet_encrypted_key = ?
+    WHERE id = ?
+  `);
+  const result = stmt.run(walletAddress, encryptedKey, tokenId);
+  return result.changes > 0;
+}
+
+/**
+ * Get tokens that have an ephemeral deployer key and are due for a fee claim.
+ * Returns tokens not claimed within the last `minAgeMinutes` minutes.
+ */
+export function getTokensForFeeClaim(minAgeMinutes: number = 30): Token[] {
+  const stmt = db.prepare(`
+    SELECT * FROM tokens
+    WHERE creator_wallet_encrypted_key IS NOT NULL
+      AND mint_address IS NOT NULL
+      AND (
+        last_fee_claim_at IS NULL
+        OR last_fee_claim_at <= datetime('now', '-' || ? || ' minutes')
+      )
+    ORDER BY last_fee_claim_at ASC NULLS FIRST, created_at ASC
+  `);
+  return stmt.all(minAgeMinutes) as Token[];
+}
+
+/**
+ * Update the last fee claim timestamp for a token.
+ */
+export function updateFeeClaimTimestamp(tokenId: number): boolean {
+  const stmt = db.prepare(`
+    UPDATE tokens SET last_fee_claim_at = datetime('now') WHERE id = ?
+  `);
+  const result = stmt.run(tokenId);
+  return result.changes > 0;
+}
+
+/**
+ * Check if a Solana address belongs to a known ephemeral deployer wallet.
+ * Used by the Helius webhook to skip internal sweep transactions.
+ */
+export function isKnownCreatorWallet(address: string): boolean {
+  const stmt = db.prepare(`
+    SELECT 1 FROM tokens WHERE creator_wallet_address = ? LIMIT 1
+  `);
+  return stmt.get(address) !== undefined;
 }
 
 // ============= REVENUE EVENTS CRUD =============

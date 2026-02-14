@@ -37,9 +37,12 @@ import {
   createToken,
   linkTokenToHeadline,
   getSetting,
+  saveCreatorWalletKey,
 } from "./db";
+import { encryptPrivateKey } from "./secrets-provider";
 import { persistImage, getImagePublicUrl } from "./image-store";
 import type { Token, TokenMetadata } from "./types";
+import bs58 from "bs58";
 
 // Pump.fun API endpoints
 const PUMP_FUN_API_URL = "https://pumpportal.fun/api";
@@ -747,6 +750,28 @@ export async function deployToken(
     );
 
     console.log(`[PumpDeployer] Created token record #${tokenRecord.id}`);
+
+    // Persist encrypted ephemeral key for future creator-fee claiming
+    const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
+    if (encryptionKey) {
+      try {
+        const base58Key = bs58.encode(Buffer.from(ephemeralWallet.secretKey));
+        const encryptedKey = encryptPrivateKey(base58Key, encryptionKey);
+        saveCreatorWalletKey(
+          tokenRecord.id,
+          ephemeralWallet.publicKey.toBase58(),
+          encryptedKey
+        );
+        console.log(`[PumpDeployer] Ephemeral key stored for token #${tokenRecord.id}`);
+      } catch (keyError) {
+        console.warn(`[PumpDeployer] Failed to store ephemeral key:`, keyError);
+      }
+    } else {
+      console.warn(
+        `[PumpDeployer] WALLET_ENCRYPTION_KEY not set — ephemeral key not stored. ` +
+        `Creator fees for this token will be unrecoverable.`
+      );
+    }
 
     // Link to headline if provided
     if (headlineId) {

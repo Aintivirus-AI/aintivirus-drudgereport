@@ -106,6 +106,12 @@ export interface Token {
   mint_address: string | null;
   pump_url: string | null;
   deployer_sol_address: string;
+  /** Ephemeral deployer wallet public key (null for legacy master-wallet deploys). */
+  creator_wallet_address: string | null;
+  /** AES-256-GCM encrypted base58 private key of the ephemeral deployer. */
+  creator_wallet_encrypted_key: string | null;
+  /** ISO timestamp of the last successful creator-fee claim for this token. */
+  last_fee_claim_at: string | null;
   created_at: string;
 }
 

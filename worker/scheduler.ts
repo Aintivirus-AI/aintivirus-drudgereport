@@ -41,6 +41,7 @@ if (!envLoaded) {
 // Track concurrent execution
 let isRunning = false;
 let isProcessingRevenue = false;
+let isClaimingFees = false;
 let cycleCount = 0;
 let isShuttingDown = false;
 
@@ -51,6 +52,7 @@ const cronTasks: ScheduledTask[] = [];
 let runSchedulerCycle: typeof import("../lib/scheduler")["runSchedulerCycle"];
 let getSchedulerStatus: typeof import("../lib/scheduler")["getSchedulerStatus"];
 let processPendingRevenue: typeof import("../lib/revenue-distributor")["processPendingRevenue"];
+let claimAllCreatorFees: typeof import("../lib/creator-fee-claimer")["claimAllCreatorFees"];
 
 /**
  * Run a scheduler cycle (called every 10 minutes by cron).
@@ -110,15 +112,42 @@ async function safeProcessRevenue(): Promise<void> {
   }
 }
 
+/**
+ * Claim creator fees from ephemeral deployer wallets with safety checks.
+ */
+async function safeClaimCreatorFees(): Promise<void> {
+  if (isClaimingFees || isShuttingDown) {
+    console.log("[Worker] Fee claiming already running or shutting down, skipping...");
+    return;
+  }
+
+  isClaimingFees = true;
+  try {
+    const result = await claimAllCreatorFees();
+    if (result.claimed > 0 || result.failed > 0) {
+      console.log(
+        `[Worker] Fee claims: ${result.claimed} claimed, ${result.failed} failed, ` +
+        `${result.totalClaimedLamports / 1e9} SOL total`
+      );
+    }
+  } catch (error) {
+    console.error("[Worker] Fee claiming error:", error);
+  } finally {
+    isClaimingFees = false;
+  }
+}
+
 // Main function
 async function main(): Promise<void> {
   // Dynamic imports: app modules are loaded HERE, after dotenv has run.
   const scheduler = await import("../lib/scheduler");
   const revenue = await import("../lib/revenue-distributor");
+  const feeClaimer = await import("../lib/creator-fee-claimer");
 
   runSchedulerCycle = scheduler.runSchedulerCycle;
   getSchedulerStatus = scheduler.getSchedulerStatus;
   processPendingRevenue = revenue.processPendingRevenue;
+  claimAllCreatorFees = feeClaimer.claimAllCreatorFees;
 
   console.log("🚀 Starting News Token Scheduler Worker");
   console.log(`📊 Initial status: ${JSON.stringify(getSchedulerStatus())}`);
@@ -138,9 +167,16 @@ async function main(): Promise<void> {
   });
   cronTasks.push(revenueTask);
 
+  // Creator fee claiming from ephemeral deployer wallets (every 30 minutes)
+  const feeClaimTask = cron.schedule("*/30 * * * *", async () => {
+    await safeClaimCreatorFees();
+  });
+  cronTasks.push(feeClaimTask);
+
   console.log("⏰ Scheduler started:");
   console.log("   - Publishing:  every 10 minutes (6/hour, 144/day)");
   console.log("   - Revenue:     every 5 minutes");
+  console.log("   - Fee claims:  every 30 minutes");
   console.log("   Press Ctrl+C to stop\n");
 
   // Graceful shutdown — waits for in-progress work to complete
@@ -158,12 +194,12 @@ async function main(): Promise<void> {
     // Wait for in-progress work (max 30 seconds)
     const maxWaitMs = 30_000;
     const startWait = Date.now();
-    while ((isRunning || isProcessingRevenue) && Date.now() - startWait < maxWaitMs) {
+    while ((isRunning || isProcessingRevenue || isClaimingFees) && Date.now() - startWait < maxWaitMs) {
       console.log("[Worker] Waiting for in-progress work to complete...");
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (isRunning || isProcessingRevenue) {
+    if (isRunning || isProcessingRevenue || isClaimingFees) {
       console.warn("[Worker] Timed out waiting for in-progress work — exiting anyway");
     }
 

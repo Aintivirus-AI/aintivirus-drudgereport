@@ -47,7 +47,8 @@ export type AuditOperation =
   | "burn_tokens"
   | "balance_check"
   | "wallet_access"
-  | "guardrail_block";
+  | "guardrail_block"
+  | "claim_creator_fee";
 
 export interface AuditEntry {
   id: number;
