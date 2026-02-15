@@ -319,7 +319,7 @@ export function getHeadlines(
     LEFT JOIN votes v ON v.headline_id = h.id
     WHERE h.column = ?
     GROUP BY h.id
-    ORDER BY wagmi_count DESC, h.created_at DESC
+    ORDER BY h.created_at DESC
     LIMIT ?
   `);
   const rows = stmt.all(column, limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string; wagmi_count: number }>;
@@ -359,7 +359,7 @@ export function getSidebarHeadlines(limit: number = 72): Headline[] {
     LEFT JOIN votes v ON v.headline_id = h.id
     WHERE h.column IN ('left', 'right')
     GROUP BY h.id
-    ORDER BY wagmi_count DESC, h.created_at DESC
+    ORDER BY h.created_at DESC
     LIMIT ?
   `);
   const rows = stmt.all(limit) as Array<Headline & { ticker?: string; pump_url?: string; token_image_url?: string; wagmi_count: number }>;

@@ -52,8 +52,12 @@ export function DesktopHeadlineLayout({
     if (sortMode === "trending") {
       return [...headlines].sort((a, b) => trendingScore(b) - trendingScore(a));
     }
-    // "popular" = default order from DB (wagmi_count DESC, created_at DESC)
-    return headlines;
+    // "popular" = sort by wagmi votes descending, then recency as tiebreaker
+    return [...headlines].sort(
+      (a, b) =>
+        (b.wagmi_count || 0) - (a.wagmi_count || 0) ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   }, [headlines, sortMode]);
 
   const leftHeadlines = sorted.filter((_, i) => i % 2 === 0);
