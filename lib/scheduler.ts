@@ -333,22 +333,20 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       }
     }
 
-    // Generate token metadata first (picks a meme theme) then deploy + enrich
+    // Generate token metadata then deploy + enrich
     let deployedTicker: string | undefined;
     let deployedPumpUrl: string | undefined;
     let deployedDescription: string | undefined;
     let deployedImageUrl: string | undefined;
-    let selectedTheme: string | undefined;
 
     try {
       console.log(
         `[Scheduler] Generating token metadata for headline #${headlineRecord.id}`
       );
       const tokenMetadata = await generateTokenMetadata(headline, content);
-      selectedTheme = tokenMetadata.theme;
 
       console.log(
-        `[Scheduler] Deploying token: ${tokenMetadata.name} (${tokenMetadata.ticker}) [theme: ${selectedTheme}]`
+        `[Scheduler] Deploying token: ${tokenMetadata.name} (${tokenMetadata.ticker})`
       );
       const deployResult = await deployToken(
         tokenMetadata,
@@ -380,11 +378,11 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       );
     }
 
-    // Generate AI importance score + McAfee commentary (with theme hint from token)
+    // Generate AI importance score + McAfee commentary
     try {
       const [importanceScore, mcafeeTake] = await Promise.all([
         scoreHeadlineImportance(headline, content),
-        generateMcAfeeTake(headline, content, false, selectedTheme),
+        generateMcAfeeTake(headline, content),
       ]);
 
       updateHeadlineImportanceScore(headlineRecord.id, importanceScore);
