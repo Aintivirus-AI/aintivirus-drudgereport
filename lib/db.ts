@@ -2125,17 +2125,15 @@ export interface FinancialStats {
   claimBatchesGross: number;
   claimAllocationsSubmitterPaid: number;
   claimAllocationsRetained: number;
-  // Deployment costs (only wallets that actually deployed a token)
-  deploymentCostLamports: number;
-  deploymentCount: number;
-  // Total pool funding (ALL wallets — total SOL ever sent out to the pool)
+  // Minting costs (from wallet_audit_log — actual SOL spent to deploy tokens)
+  mintingCostLamports: number;
+  mintingCount: number;
+  // Pool funding costs (deployer_pool — SOL sent to pre-funded wallets)
   totalPoolFundedLamports: number;
   totalPoolFundedCount: number;
-  // Pool breakdown by status
-  poolReadyLamports: number;
-  poolReadyCount: number;
-  poolFailedLamports: number;
-  poolFailedCount: number;
+  // All outbound SOL from master wallet (send_sol + deploy_token + buy_burn from audit log)
+  totalOutflowLamports: number;
+  totalOutflowCount: number;
   // Computed totals
   grossRevenue: number;
   totalPaidToSubmitters: number;
@@ -2146,7 +2144,8 @@ export interface FinancialStats {
 
 /**
  * Get comprehensive financial statistics for a given time period.
- * Combines data from revenue_events, claim_batches/allocations, and deployer_pool.
+ * Combines data from revenue_events, claim_batches/allocations, wallet_audit_log,
+ * and deployer_pool.
  *
  * @param period - 'day' | 'week' | 'all'
  */
@@ -2156,6 +2155,14 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
     dateFilter = "AND created_at >= datetime('now', '-1 day')";
   } else if (period === "week") {
     dateFilter = "AND created_at >= datetime('now', '-7 days')";
+  }
+
+  // Date filter variant for wallet_audit_log (uses `timestamp` column)
+  let auditDateFilter = "";
+  if (period === "day") {
+    auditDateFilter = "AND timestamp >= datetime('now', '-1 day')";
+  } else if (period === "week") {
+    auditDateFilter = "AND timestamp >= datetime('now', '-7 days')";
   }
 
   // Revenue events (ephemeral wallet per-token claims)
@@ -2192,17 +2199,29 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
       ${dateFilter.replace(/created_at/g, "ca.created_at")}
   `).get() as { submitter_paid: number; retained: number };
 
-  // Deployment costs (used pool wallets — tokens actually deployed)
-  const deployRow = db.prepare(`
+  // Minting costs (from wallet_audit_log — actual SOL spent to deploy tokens on pump.fun)
+  const mintRow = db.prepare(`
     SELECT
       COUNT(*) as cnt,
-      COALESCE(SUM(funded_lamports), 0) as cost
-    FROM deployer_pool
-    WHERE status = 'used'
-      ${dateFilter.replace(/created_at/g, "used_at")}
+      COALESCE(SUM(amount_lamports), 0) as cost
+    FROM wallet_audit_log
+    WHERE operation = 'deploy_token'
+      AND success = 1
+      ${auditDateFilter}
   `).get() as { cnt: number; cost: number };
 
-  // Total pool funding (ALL wallets — every lamport that ever left the master wallet for the pool)
+  // Total outflow from master wallet (all successful outbound operations from audit log)
+  const outflowRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(amount_lamports), 0) as total
+    FROM wallet_audit_log
+    WHERE operation IN ('send_sol', 'deploy_token', 'buy_burn')
+      AND success = 1
+      ${auditDateFilter}
+  `).get() as { cnt: number; total: number };
+
+  // Pool funding costs (deployer_pool — SOL sent to pre-funded ephemeral wallets)
   const poolTotalRow = db.prepare(`
     SELECT
       COUNT(*) as cnt,
@@ -2212,30 +2231,13 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
       ${dateFilter.replace(/created_at/g, "funded_at")}
   `).get() as { cnt: number; total: number };
 
-  // Pool wallets still holding SOL (ready + reserved = potentially recoverable)
-  const poolReadyRow = db.prepare(`
-    SELECT
-      COUNT(*) as cnt,
-      COALESCE(SUM(funded_lamports), 0) as total
-    FROM deployer_pool
-    WHERE status IN ('ready', 'reserved')
-      ${dateFilter.replace(/created_at/g, "funded_at")}
-  `).get() as { cnt: number; total: number };
-
-  // Pool wallets that failed (SOL may still be on-chain, partially recoverable)
-  const poolFailedRow = db.prepare(`
-    SELECT
-      COUNT(*) as cnt,
-      COALESCE(SUM(funded_lamports), 0) as total
-    FROM deployer_pool
-    WHERE status = 'failed'
-      ${dateFilter.replace(/created_at/g, "funded_at")}
-  `).get() as { cnt: number; total: number };
-
   const grossRevenue = revenueRow.gross + batchRow.gross;
   const totalPaidToSubmitters = revenueRow.submitter_paid + allocRow.submitter_paid;
-  const totalRetained = revenueRow.retained + allocRow.retained;
-  const totalSpent = totalPaidToSubmitters + poolTotalRow.total;
+  // Our revenue = everything that stayed in the master wallet (gross minus what we sent to submitters).
+  // This correctly accounts for skipped/undistributed bulk claim allocations.
+  const totalRetained = grossRevenue - totalPaidToSubmitters;
+  // Total spent = submitter payouts + minting costs + pool funding
+  const totalSpent = totalPaidToSubmitters + mintRow.cost + poolTotalRow.total;
   const netProfit = grossRevenue - totalSpent;
 
   return {
@@ -2248,14 +2250,12 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
     claimBatchesGross: batchRow.gross,
     claimAllocationsSubmitterPaid: allocRow.submitter_paid,
     claimAllocationsRetained: allocRow.retained,
-    deploymentCostLamports: deployRow.cost,
-    deploymentCount: deployRow.cnt,
+    mintingCostLamports: mintRow.cost,
+    mintingCount: mintRow.cnt,
     totalPoolFundedLamports: poolTotalRow.total,
     totalPoolFundedCount: poolTotalRow.cnt,
-    poolReadyLamports: poolReadyRow.total,
-    poolReadyCount: poolReadyRow.cnt,
-    poolFailedLamports: poolFailedRow.total,
-    poolFailedCount: poolFailedRow.cnt,
+    totalOutflowLamports: outflowRow.total,
+    totalOutflowCount: outflowRow.cnt,
     grossRevenue,
     totalPaidToSubmitters,
     totalRetained,

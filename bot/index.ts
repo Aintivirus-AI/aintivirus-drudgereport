@@ -1174,18 +1174,16 @@ bot.command("finances", async (ctx) => {
 
     msg += `*Total Spent:* \`${fmt(stats.totalSpent)} SOL\`\n`;
     msg += `  Submitter Payouts: \`${fmt(stats.totalPaidToSubmitters)} SOL\`\n`;
-    msg += `  Pool Funding: \`${fmt(stats.totalPoolFundedLamports)} SOL\` (${stats.totalPoolFundedCount} wallets)\n`;
-    msg += `    Deployed: \`${fmt(stats.deploymentCostLamports)} SOL\` (${stats.deploymentCount})\n`;
-    if (stats.poolReadyCount > 0) {
-      msg += `    Ready/Reserved: \`${fmt(stats.poolReadyLamports)} SOL\` (${stats.poolReadyCount})\n`;
-    }
-    if (stats.poolFailedCount > 0) {
-      msg += `    Failed: \`${fmt(stats.poolFailedLamports)} SOL\` (${stats.poolFailedCount})\n`;
+    msg += `  Token Minting: \`${fmt(stats.mintingCostLamports)} SOL\` (${stats.mintingCount} tokens)\n`;
+    if (stats.totalPoolFundedCount > 0) {
+      msg += `  Pool Funding: \`${fmt(stats.totalPoolFundedLamports)} SOL\` (${stats.totalPoolFundedCount} wallets)\n`;
     }
     msg += `\n`;
 
     msg += `*Our Revenue:* \`${fmt(stats.totalRetained)} SOL\`\n`;
-    msg += `*Net Profit:* \`${fmt(stats.netProfit)} SOL\``;
+    msg += `*Net Profit:* \`${fmt(stats.netProfit)} SOL\`\n\n`;
+
+    msg += `_Total Outflow: ${fmt(stats.totalOutflowLamports)} SOL (${stats.totalOutflowCount} txns)_`;
 
     await ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (error) {
