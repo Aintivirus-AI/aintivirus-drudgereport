@@ -8,7 +8,7 @@
  */
 
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: ".env.local" });
 
 import { getAllTokens } from "../lib/db";
 import { decryptPrivateKey } from "../lib/secrets-provider";
