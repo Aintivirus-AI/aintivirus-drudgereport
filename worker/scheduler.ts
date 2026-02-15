@@ -117,7 +117,8 @@ async function safeProcessRevenue(): Promise<void> {
 }
 
 /**
- * Claim creator fees from ephemeral deployer wallets with safety checks.
+ * Claim creator fees from the master wallet (and any legacy ephemeral wallets).
+ * Runs every 30 minutes via cron.
  */
 async function safeClaimCreatorFees(): Promise<void> {
   if (isClaimingFees || isShuttingDown) {
