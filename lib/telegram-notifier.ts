@@ -173,6 +173,41 @@ export async function notifySubmitterRejected(opts: {
 }
 
 /**
+ * Notify a submitter that their approved story was not selected this round
+ * because a more urgent headline won the 10-minute publishing window.
+ * Encourages them to resubmit for the next window.
+ */
+export async function notifySubmitterNotSelected(opts: {
+  telegramUserId: string;
+  submissionId: number;
+  title: string;
+  winnerHeadline: string;
+}): Promise<void> {
+  const { telegramUserId, submissionId, title, winnerHeadline } = opts;
+
+  const safeTitle = escapeTelegramMarkdown(title || "your article");
+  const safeWinner = escapeTelegramMarkdown(
+    winnerHeadline.length > 80 ? winnerHeadline.substring(0, 77) + "..." : winnerHeadline
+  );
+
+  const message =
+    `*Not Selected This Round* ⏳\n` +
+    `─────────────────────\n\n` +
+    `${safeTitle}\n\n` +
+    `Your story was approved but a more urgent headline was selected for this publishing window:\n` +
+    `_"${safeWinner}"_\n\n` +
+    `If you think your news is important, feel free to resubmit with /submit for the next 10\\-minute window\\.\n\n` +
+    `_Submission \\#${submissionId}_`;
+
+  const sent = await sendTelegramMessage(telegramUserId, message);
+  if (sent) {
+    console.log(
+      `[TelegramNotifier] Notified user ${telegramUserId} — not selected #${submissionId}`
+    );
+  }
+}
+
+/**
  * Notify admins about important events.
  * Sends to all admins concurrently (not sequentially).
  */

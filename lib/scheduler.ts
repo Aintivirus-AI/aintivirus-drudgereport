@@ -3,9 +3,9 @@
  *
  * Queue strategy:
  * - Validates up to 10 pending submissions per cycle
- * - Publishes up to 3 approved submissions per cycle (not just 1)
- * - Fair user interleaving: round-robins across different submitters
- *   so one power user can't dominate the queue
+ * - Publishes exactly 1 article per 10-minute cycle (6/hour, 144/day)
+ * - AI competition: when multiple approved submissions exist, AI picks
+ *   the most newsworthy one. Losers are rejected with a resubmit message.
  * - Caches fetched content during validation to avoid double-fetch
  */
 
@@ -28,9 +28,10 @@ import {
 import { validateSubmission, smartFetchContent } from "./ai-validator";
 import { generateTokenMetadata } from "./token-generator";
 import { deployToken } from "./pump-deployer";
-import { notifySubmitterPublished, notifySubmitterApproved, notifySubmitterRejected } from "./telegram-notifier";
+import { notifySubmitterPublished, notifySubmitterApproved, notifySubmitterRejected, notifySubmitterNotSelected } from "./telegram-notifier";
 import { tweetArticlePublished, isTwitterConfigured } from "./twitter-poster";
-import { generateMcAfeeTake, scoreHeadlineImportance, generateTweetHeadlineAndSummary } from "./mcafee-commentator";
+import { generateMcAfeeTake, scoreHeadlineImportance, generateTweetHeadlineAndSummary, pickMostImportantSubmission } from "./mcafee-commentator";
+import type { HeadlineCandidate } from "./mcafee-commentator";
 import { ActivityLog } from "./activity-logger";
 import { ensureEnglish } from "./translator";
 import type { Submission, PageContent } from "./types";
@@ -38,10 +39,9 @@ import type { Submission, PageContent } from "./types";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // Configuration
-// 6 per hour × 24 hours = 144 daily max
+// 1 per 10 min × 6 per hour × 24 hours = 144 daily max
 const MAX_ARTICLES_PER_DAY = 144;
 const VALIDATION_BATCH_SIZE = 10;  // validate up to 10 per cycle
-const PUBLISH_BATCH_SIZE = 1;      // publish 1 per cycle (every 10 minutes = 6/hour)
 
 /**
  * Process the validation queue – validate pending submissions.
@@ -184,43 +184,30 @@ export async function processValidationQueue(): Promise<number> {
 }
 
 /**
- * Fair interleave: reorder submissions so different users alternate.
- *
- * Given [A1, A2, A3, B1, C1, C2] (sorted by created_at ASC),
- * produces [A1, B1, C1, A2, C2, A3] — round-robin across users.
- *
- * Within each user's group, FIFO order is preserved (oldest first).
+ * Parse the cached content title from a submission.
+ * Returns a fallback if cached content is missing or unparseable.
  */
-function fairInterleave(submissions: Submission[]): Submission[] {
-  // Group by submitter, preserving FIFO within each group
-  const byUser = new Map<string, Submission[]>();
-  for (const sub of submissions) {
-    const userId = sub.telegram_user_id;
-    if (!byUser.has(userId)) {
-      byUser.set(userId, []);
-    }
-    byUser.get(userId)!.push(sub);
+function parseCachedTitle(submission: Submission): string {
+  if (!submission.cached_content) return "Untitled";
+  try {
+    const cached = JSON.parse(submission.cached_content);
+    return cached.title || "Untitled";
+  } catch {
+    return "Untitled";
   }
+}
 
-  // Round-robin across groups
-  const result: Submission[] = [];
-  const groups = [...byUser.values()];
-  let exhausted = 0;
-  let round = 0;
-
-  while (exhausted < groups.length) {
-    exhausted = 0;
-    for (const group of groups) {
-      if (round < group.length) {
-        result.push(group[round]);
-      } else {
-        exhausted++;
-      }
-    }
-    round++;
+/**
+ * Parse the cached content description from a submission.
+ */
+function parseCachedDescription(submission: Submission): string {
+  if (!submission.cached_content) return "";
+  try {
+    const cached = JSON.parse(submission.cached_content);
+    return cached.description || "";
+  } catch {
+    return "";
   }
-
-  return result;
 }
 
 /**
@@ -463,12 +450,22 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
 }
 
 /**
- * Publish up to PUBLISH_BATCH_SIZE approved submissions, using fair
- * round-robin across submitters so no single user dominates.
+ * AI-powered competitive publishing: fetch ALL approved submissions,
+ * let AI pick the single most newsworthy one, publish it, and reject
+ * the rest with a friendly resubmit message.
  *
- * Returns the list of successfully published submissions.
+ * Max 1 per cycle (every 10 min = 6/hour, 144/day).
  */
 export async function publishApprovedBatch(): Promise<Submission[]> {
+  // Random jitter delay to break predictable launch timing
+  // (bots detect fixed-cadence launchers and blacklist them)
+  const jitterMax = parseInt(process.env.PUBLISH_JITTER_MAX_SECONDS || "180", 10);
+  if (jitterMax > 0) {
+    const jitterMs = Math.floor(Math.random() * jitterMax * 1000);
+    console.log(`[Scheduler] Jitter delay: ${(jitterMs / 1000).toFixed(1)}s`);
+    await new Promise(resolve => setTimeout(resolve, jitterMs));
+  }
+
   // Check daily limit
   const publishedToday = getPublishedTodayCount();
   const remaining = MAX_ARTICLES_PER_DAY - publishedToday;
@@ -479,40 +476,90 @@ export async function publishApprovedBatch(): Promise<Submission[]> {
     return [];
   }
 
-  // Fetch more than we need so fair interleaving has room to work
-  const approved = getSubmissionsByStatus("approved", PUBLISH_BATCH_SIZE * 5);
+  // Fetch ALL approved submissions (no small limit — they all compete)
+  const approved = getSubmissionsByStatus("approved", 100);
   if (approved.length === 0) {
     console.log("[Scheduler] No approved submissions to publish");
     return [];
   }
 
-  // Fair interleave across different submitters
-  const ordered = fairInterleave(approved);
-
-  // Publish up to the batch size (or daily remaining, whichever is smaller)
-  const toPublish = ordered.slice(0, Math.min(PUBLISH_BATCH_SIZE, remaining));
-
   console.log(
-    `[Scheduler] Publishing ${toPublish.length} submissions (${approved.length} approved, ` +
-    `${remaining} daily slots remaining)`
+    `[Scheduler] ${approved.length} approved submission(s) competing for this window ` +
+    `(${remaining} daily slots remaining)`
   );
 
-  const published: Submission[] = [];
+  // ── Pick the winner ──────────────────────────────────────────────
+  let winner: Submission;
+  let winnerHeadline: string;
 
-  for (const submission of toPublish) {
-    const result = await publishOneSubmission(submission);
-    if (result) {
-      published.push(result);
+  if (approved.length === 1) {
+    // Only one candidate — no competition needed
+    winner = approved[0];
+    winnerHeadline = parseCachedTitle(winner);
+    console.log(`[Scheduler] Single candidate — auto-selecting #${winner.id}`);
+  } else {
+    // Build candidate list for AI comparison
+    const candidates: HeadlineCandidate[] = approved.map((s) => ({
+      id: s.id,
+      headline: parseCachedTitle(s),
+      description: parseCachedDescription(s),
+    }));
+
+    const { winnerId, reasoning } = await pickMostImportantSubmission(candidates);
+    const found = approved.find((s) => s.id === winnerId);
+
+    if (!found) {
+      // Defensive: AI returned an ID we don't recognize — fall back to first
+      console.warn(`[Scheduler] Winner ID #${winnerId} not found, falling back to oldest`);
+      winner = approved[0];
+    } else {
+      winner = found;
     }
 
-    // Small delay between deployments to avoid RPC rate limits
-    if (published.length < toPublish.length) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+    winnerHeadline = parseCachedTitle(winner);
+    console.log(
+      `[Scheduler] AI selected #${winner.id} ("${winnerHeadline.slice(0, 60)}") — ${reasoning}`
+    );
+
+    // ── Reject losers ────────────────────────────────────────────
+    const losers = approved.filter((s) => s.id !== winner.id);
+    console.log(`[Scheduler] Rejecting ${losers.length} non-selected submission(s)`);
+
+    for (const loser of losers) {
+      const loserTitle = parseCachedTitle(loser);
+
+      try {
+        updateSubmissionStatus(
+          loser.id,
+          "rejected",
+          "A more urgent story was selected for this publishing window"
+        );
+
+        ActivityLog.notSelected(loser.id, loserTitle, winnerHeadline);
+
+        // Notify the submitter — fire-and-forget
+        notifySubmitterNotSelected({
+          telegramUserId: loser.telegram_user_id,
+          submissionId: loser.id,
+          title: loserTitle,
+          winnerHeadline,
+        }).catch((err) =>
+          console.warn(`[Scheduler] Failed to notify not-selected #${loser.id}:`, err)
+        );
+      } catch (rejectError) {
+        console.warn(`[Scheduler] Failed to reject loser #${loser.id}:`, rejectError);
+      }
     }
   }
 
-  console.log(`[Scheduler] Published ${published.length}/${toPublish.length} submissions`);
-  return published;
+  // ── Publish the winner ───────────────────────────────────────────
+  const result = await publishOneSubmission(winner);
+  if (result) {
+    console.log(`[Scheduler] Published winner #${winner.id}`);
+    return [result];
+  }
+
+  return [];
 }
 
 /**
@@ -559,7 +606,7 @@ export function getNextIntervalMs(): number {
 /**
  * Run a full scheduler cycle:
  * 1. Process validation queue (up to 10)
- * 2. Publish approved submissions (up to 3, fair-interleaved)
+ * 2. AI-select and publish the most important approved submission (1 per cycle)
  */
 export async function runSchedulerCycle(): Promise<{
   validated: number;
@@ -574,16 +621,19 @@ export async function runSchedulerCycle(): Promise<{
     console.log(`[Scheduler] Purged ${purged} stale submission(s) older than 72h`);
   }
 
-  // FIFO cleanup: keep 50 headlines per column, remove oldest beyond that.
-  // The homepage displays 72 sidebar headlines total, so 50 per column (100 left+right)
-  // is generous headroom while preventing unbounded growth.
-  const cleaned = cleanupOldHeadlines(50);
-  if (cleaned > 0) {
-    console.log(`[Scheduler] Cleaned up ${cleaned} old headline(s) (FIFO rotation)`);
-  }
-
   const validated = await processValidationQueue();
   const published = await publishApprovedBatch();
+
+  // FIFO cleanup AFTER publishing so it can never block new articles.
+  // Keeps 50 headlines per column, removes oldest beyond that.
+  try {
+    const cleaned = cleanupOldHeadlines(50);
+    if (cleaned > 0) {
+      console.log(`[Scheduler] Cleaned up ${cleaned} old headline(s) (FIFO rotation)`);
+    }
+  } catch (cleanupError) {
+    console.warn(`[Scheduler] Headline cleanup failed (non-fatal):`, cleanupError);
+  }
 
   console.log(
     `[Scheduler] Cycle complete — validated ${validated}, published ${published.length}`

@@ -5,6 +5,9 @@
  * for every published headline. Uses gpt-4o-mini for cost efficiency.
  *
  * Also generates clean headlines and summaries for tweet-sourced articles.
+ *
+ * AI headline selection: pickMostImportantSubmission() compares all approved
+ * candidates in a single prompt and picks the most newsworthy one to publish.
  */
 
 import OpenAI from "openai";
@@ -318,4 +321,138 @@ Respond in this EXACT JSON format — no markdown, no code fences:
       summary: `${authorName}${authorHandle ? ` (${authorHandle})` : ""} reported: ${tweetText}`,
     };
   }
+}
+
+// ============= HEADLINE SELECTION =============
+
+/** Candidate structure for the AI headline picker. */
+export interface HeadlineCandidate {
+  id: number;
+  headline: string;
+  description: string;
+}
+
+/**
+ * Compare all approved candidates in a single AI call and pick the most
+ * newsworthy one to publish right now.
+ *
+ * Returns the winning submission ID and a brief reasoning string.
+ * On failure, falls back to scoring each candidate individually with
+ * scoreHeadlineImportance() and picking the highest.
+ */
+export async function pickMostImportantSubmission(
+  candidates: HeadlineCandidate[]
+): Promise<{ winnerId: number; reasoning: string }> {
+  if (candidates.length === 0) {
+    throw new Error("No candidates to pick from");
+  }
+  if (candidates.length === 1) {
+    return { winnerId: candidates[0].id, reasoning: "Only candidate" };
+  }
+
+  // Build a numbered list for the prompt
+  const candidateList = candidates
+    .map((c, i) => {
+      const safeHeadline = sanitizeForPrompt(c.headline || "Untitled", 200);
+      const safeDesc = c.description
+        ? sanitizeForPrompt(c.description, 200)
+        : "";
+      return `${i + 1}. [ID=${c.id}] ${safeHeadline}${safeDesc ? `\n   Context: ${safeDesc}` : ""}`;
+    })
+    .join("\n\n");
+
+  try {
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are the senior news editor for The McAfee Report — a fast-moving crypto and tech news site. Your job is to pick the SINGLE most newsworthy headline to publish right now.
+
+Selection criteria (in priority order):
+1. Breaking / time-sensitive news (regulatory actions, hacks, major launches)
+2. Market-moving events (price movements, ETF decisions, exchange news)
+3. Broad community impact (affects many people, not just one project)
+4. Novelty and surprise (unexpected developments over routine updates)
+5. Source credibility (official announcements over rumors)
+
+You will be given a numbered list of candidate headlines with optional context.
+
+Respond in this EXACT JSON format — no markdown, no code fences:
+{"winnerId": <the ID number>, "reasoning": "<one sentence explaining why this is the top pick>"}`,
+        },
+        {
+          role: "user",
+          content: `Pick the single most important headline to publish right now:\n\n${candidateList}`,
+        },
+      ],
+      max_tokens: 150,
+      temperature: 0.2,
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim();
+    if (!raw) throw new Error("Empty response from OpenAI");
+
+    // Parse JSON — strip code fences if model wraps them
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+    let parsed: { winnerId?: number; reasoning?: string };
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      console.error("[McAfee] Failed to parse headline picker JSON:", jsonStr);
+      throw new Error("AI returned invalid JSON for headline selection");
+    }
+
+    const winnerId = parsed.winnerId;
+    const reasoning = (parsed.reasoning || "").trim();
+
+    // Validate that winnerId is one of the candidates
+    if (!winnerId || !candidates.some((c) => c.id === winnerId)) {
+      console.warn(
+        `[McAfee] AI returned invalid winnerId=${winnerId}, falling back to scoring`
+      );
+      throw new Error(`Invalid winnerId: ${winnerId}`);
+    }
+
+    console.log(
+      `[McAfee] Headline picker chose submission #${winnerId}: ${reasoning}`
+    );
+    return { winnerId, reasoning };
+  } catch (error) {
+    console.warn("[McAfee] Headline picker failed, falling back to individual scoring:", error);
+    return fallbackScoring(candidates);
+  }
+}
+
+/**
+ * Fallback: score each candidate individually and pick the highest.
+ * Uses scoreHeadlineImportance() for each, picks max. FIFO tiebreaker.
+ */
+async function fallbackScoring(
+  candidates: HeadlineCandidate[]
+): Promise<{ winnerId: number; reasoning: string }> {
+  const scored: { id: number; score: number }[] = [];
+
+  for (const c of candidates) {
+    const content: PageContent = {
+      title: c.headline,
+      description: c.description,
+      content: "",
+      imageUrl: null,
+    };
+    const score = await scoreHeadlineImportance(c.headline, content);
+    scored.push({ id: c.id, score });
+  }
+
+  // Sort by score descending, FIFO tiebreaker (lower id = older = first)
+  scored.sort((a, b) => b.score - a.score || a.id - b.id);
+
+  const winner = scored[0];
+  console.log(
+    `[McAfee] Fallback scoring picked submission #${winner.id} (score=${winner.score})`
+  );
+  return {
+    winnerId: winner.id,
+    reasoning: `Fallback scoring: highest importance score (${winner.score}/100)`,
+  };
 }

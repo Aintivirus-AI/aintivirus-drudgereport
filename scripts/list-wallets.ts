@@ -11,16 +11,19 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 import { getAllTokens } from "../lib/db";
+import db from "../lib/db";
 import { decryptPrivateKey } from "../lib/secrets-provider";
 
 const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
 
-if (!encryptionKey) {
-  console.error("ERROR: WALLET_ENCRYPTION_KEY not set in .env");
-  process.exit(1);
-}
-
 const tokens = getAllTokens(9999);
+
+// Build a lookup of submission_id -> submitter sol_address
+const submitterMap = new Map<number, string>();
+const submissions = db.prepare(`SELECT id, sol_address FROM submissions`).all() as { id: number; sol_address: string }[];
+for (const s of submissions) {
+  submitterMap.set(s.id, s.sol_address);
+}
 
 const walletsWithKeys = tokens.filter(
   (t) => t.creator_wallet_encrypted_key && t.mint_address
@@ -31,16 +34,22 @@ console.log("=".repeat(120));
 
 for (const token of walletsWithKeys) {
   try {
+    if (!encryptionKey) {
+      console.warn("WALLET_ENCRYPTION_KEY not set — cannot decrypt ephemeral keys");
+      break;
+    }
     const privateKey = decryptPrivateKey(
       token.creator_wallet_encrypted_key!,
       encryptionKey
     );
 
+    const submitterWallet = token.submission_id ? submitterMap.get(token.submission_id) || "unknown" : "N/A";
     console.log(`Ticker:      ${token.ticker}`);
     console.log(`Token Name:  ${token.token_name}`);
     console.log(`Token ID:    ${token.id}`);
     console.log(`Mint:        ${token.mint_address}`);
     console.log(`Pump URL:    ${token.pump_url || `https://pump.fun/coin/${token.mint_address}`}`);
+    console.log(`Submitter:   ${submitterWallet}`);
     console.log(`Wallet Addr: ${token.creator_wallet_address}`);
     console.log(`Private Key: ${privateKey}`);
     console.log(`Created:     ${token.created_at}`);
@@ -63,10 +72,12 @@ if (masterWalletTokens.length > 0) {
   console.log(`(These don't have separate wallets — fees go directly to your master wallet)\n`);
 
   for (const token of masterWalletTokens) {
+    const submitterWallet = token.submission_id ? submitterMap.get(token.submission_id) || "unknown" : "N/A";
     console.log(`Ticker:      ${token.ticker}`);
     console.log(`Token Name:  ${token.token_name}`);
     console.log(`Mint:        ${token.mint_address}`);
     console.log(`Pump URL:    ${token.pump_url || `https://pump.fun/coin/${token.mint_address}`}`);
+    console.log(`Submitter:   ${submitterWallet}`);
     console.log(`Deployer:    ${token.deployer_sol_address}`);
     console.log(`Created:     ${token.created_at}`);
     console.log("-".repeat(120));

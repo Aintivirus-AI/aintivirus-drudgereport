@@ -38,8 +38,11 @@ import {
   linkTokenToHeadline,
   getSetting,
   saveCreatorWalletKey,
+  claimPoolWallet,
+  markPoolWalletUsed,
+  markPoolWalletFailed,
 } from "./db";
-import { encryptPrivateKey } from "./secrets-provider";
+import { encryptPrivateKey, decryptPrivateKey } from "./secrets-provider";
 import { persistImage, getImagePublicUrl } from "./image-store";
 import type { Token, TokenMetadata } from "./types";
 import bs58 from "bs58";
@@ -588,50 +591,84 @@ export async function deployToken(
   let connection!: Connection;
   let masterWallet!: Keypair;
   let ephemeralWallet: Keypair | null = null;
+  let poolWalletId: number | null = null; // Track pool wallet for status updates
 
   try {
     connection = getConnection();
     masterWallet = secureGetWallet("pump-deployer");
 
-    // Pre-flight guardrail check (deployment + ephemeral wallet funding)
-    const guardrailCheck = checkOperation(
-      Math.floor(EPHEMERAL_FUND_SOL * LAMPORTS_PER_SOL),
-      "pump-deployer"
-    );
-    if (!guardrailCheck.allowed) {
-      return {
-        success: false,
-        error: `Guardrail blocked deployment: ${guardrailCheck.reason}`,
-      };
+    // ── Try to claim a pre-funded wallet from the pool first ──
+    const minAgeMinutes = parseInt(process.env.WALLET_POOL_MIN_AGE_MINUTES || "0", 10);
+    const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
+    const poolWallet = encryptionKey ? claimPoolWallet(minAgeMinutes) : null;
+
+    if (poolWallet) {
+      // Use pre-funded pool wallet (breaks the on-chain funding trail)
+      poolWalletId = poolWallet.id;
+      try {
+        const base58Key = decryptPrivateKey(poolWallet.encrypted_key, encryptionKey!);
+        ephemeralWallet = Keypair.fromSecretKey(bs58.decode(base58Key));
+        console.log(
+          `[PumpDeployer] Using pool wallet #${poolWallet.id}: ${ephemeralWallet.publicKey.toBase58()} ` +
+          `(funded ${poolWallet.funded_at})`
+        );
+      } catch (decryptError) {
+        console.error(`[PumpDeployer] Failed to decrypt pool wallet #${poolWallet.id}:`, decryptError);
+        markPoolWalletFailed(poolWallet.id);
+        poolWalletId = null;
+        // Fall through to inline funding below
+      }
     }
 
-    // Check balance (master wallet needs enough to fund ephemeral deployer)
-    const balanceCheck = await checkDeploymentBalance();
-    if (!balanceCheck.hasEnough) {
-      return {
-        success: false,
-        error: `Insufficient balance: ${balanceCheck.balance} SOL (need ${EPHEMERAL_FUND_SOL} SOL)`,
-      };
+    if (!ephemeralWallet) {
+      // Fallback: create and fund an ephemeral wallet inline (old behavior)
+      if (poolWalletId === null) {
+        console.warn(
+          `[PumpDeployer] Wallet pool empty or unavailable — falling back to inline funding. ` +
+          `Run 'npx tsx scripts/prefund-wallets.ts' to pre-seed the pool.`
+        );
+      }
+
+      // Pre-flight guardrail check (deployment + ephemeral wallet funding)
+      const guardrailCheck = checkOperation(
+        Math.floor(EPHEMERAL_FUND_SOL * LAMPORTS_PER_SOL),
+        "pump-deployer"
+      );
+      if (!guardrailCheck.allowed) {
+        return {
+          success: false,
+          error: `Guardrail blocked deployment: ${guardrailCheck.reason}`,
+        };
+      }
+
+      // Check balance (master wallet needs enough to fund ephemeral deployer)
+      const balanceCheck = await checkDeploymentBalance();
+      if (!balanceCheck.hasEnough) {
+        return {
+          success: false,
+          error: `Insufficient balance: ${balanceCheck.balance} SOL (need ${EPHEMERAL_FUND_SOL} SOL)`,
+        };
+      }
+
+      console.log(`[PumpDeployer] Wallet balance: ${balanceCheck.balance} SOL`);
+
+      // Create ephemeral deployer wallet (unique address for every deployment)
+      ephemeralWallet = Keypair.generate();
+      console.log(
+        `[PumpDeployer] Ephemeral deployer (inline): ${ephemeralWallet.publicKey.toBase58()}`
+      );
+
+      // Fund ephemeral wallet from master wallet
+      const fundSig = await fundEphemeralWallet(
+        connection,
+        masterWallet,
+        ephemeralWallet,
+        Math.floor(EPHEMERAL_FUND_SOL * LAMPORTS_PER_SOL)
+      );
+      console.log(
+        `[PumpDeployer] Funded ephemeral wallet with ${EPHEMERAL_FUND_SOL} SOL (tx: ${fundSig})`
+      );
     }
-
-    console.log(`[PumpDeployer] Wallet balance: ${balanceCheck.balance} SOL`);
-
-    // Create ephemeral deployer wallet (unique address for every deployment)
-    ephemeralWallet = Keypair.generate();
-    console.log(
-      `[PumpDeployer] Ephemeral deployer: ${ephemeralWallet.publicKey.toBase58()}`
-    );
-
-    // Fund ephemeral wallet from master wallet
-    const fundSig = await fundEphemeralWallet(
-      connection,
-      masterWallet,
-      ephemeralWallet,
-      Math.floor(EPHEMERAL_FUND_SOL * LAMPORTS_PER_SOL)
-    );
-    console.log(
-      `[PumpDeployer] Funded ephemeral wallet with ${EPHEMERAL_FUND_SOL} SOL (tx: ${fundSig})`
-    );
 
     // Persist the token logo to permanent storage (used on the site)
     let persistedImageUrl = metadata.imageUrl;
@@ -688,6 +725,9 @@ export async function deployToken(
 
     if (!metadataUri) {
       await sweepEphemeralWallet(connection, ephemeralWallet, masterWallet.publicKey);
+      if (poolWalletId !== null) {
+        markPoolWalletFailed(poolWalletId);
+      }
       return {
         success: false,
         error: "Failed to upload token metadata after multiple attempts",
@@ -752,8 +792,14 @@ export async function deployToken(
 
     console.log(`[PumpDeployer] Created token record #${tokenRecord.id}`);
 
+    // Mark pool wallet as used (with token ID for traceability)
+    if (poolWalletId !== null) {
+      markPoolWalletUsed(poolWalletId, tokenRecord.id);
+      console.log(`[PumpDeployer] Pool wallet #${poolWalletId} marked as used`);
+    }
+
     // Persist encrypted ephemeral key for future creator-fee claiming
-    const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
+    // (encryptionKey already resolved at top of try block)
     if (encryptionKey) {
       try {
         const base58Key = bs58.encode(Buffer.from(ephemeralWallet.secretKey));
@@ -805,6 +851,12 @@ export async function deployToken(
     // Sweep ephemeral wallet if it was funded before the failure
     if (ephemeralWallet) {
       await sweepEphemeralWallet(connection, ephemeralWallet, masterWallet.publicKey);
+    }
+
+    // Mark pool wallet as failed (auto-recovery cron will sweep any remaining SOL)
+    if (poolWalletId !== null) {
+      markPoolWalletFailed(poolWalletId);
+      console.warn(`[PumpDeployer] Pool wallet #${poolWalletId} marked as failed`);
     }
 
     // Audit log the failed deployment

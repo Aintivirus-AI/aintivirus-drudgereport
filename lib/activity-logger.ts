@@ -77,6 +77,14 @@ export const ActivityLog = {
     );
   },
 
+  notSelected(submissionId: number, headline: string, winnerHeadline: string) {
+    logActivity(
+      "not_selected",
+      `Submission #${submissionId} not selected — "${headline.slice(0, 60)}" bumped by "${winnerHeadline.slice(0, 60)}"`,
+      { submissionId, headline, winnerHeadline }
+    );
+  },
+
   voteCast(headlineId: number, voteType: "wagmi" | "ngmi") {
     logActivity(
       "vote_cast",

@@ -22,6 +22,8 @@ import type {
   ClaimAllocation,
   ClaimAllocationStatus,
   TokenVolumeSnapshot,
+  PoolWallet,
+  PoolStats,
 } from "./types";
 
 // Database path
@@ -217,6 +219,20 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Pre-funded deployer wallet pool (breaks on-chain funding trail)
+  CREATE TABLE IF NOT EXISTS deployer_pool (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    address TEXT NOT NULL UNIQUE,
+    encrypted_key TEXT NOT NULL,
+    funded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    funded_lamports INTEGER NOT NULL,
+    status TEXT DEFAULT 'ready' CHECK(status IN ('ready', 'reserved', 'used', 'failed')),
+    reserved_at DATETIME,
+    used_at DATETIME,
+    token_id INTEGER REFERENCES tokens(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -1291,29 +1307,34 @@ export function getRevenueStats(): { total: number; distributed: number; burned:
  */
 export function cleanupOldHeadlines(keepCount: number = 100): number {
   const txn = db.transaction(() => {
-    // Find IDs that will be deleted
+    // Find IDs that will be deleted.
+    // Each branch must be wrapped in a subquery because SQLite does not
+    // allow ORDER BY inside individual UNION ALL branches.
     const toDelete = db.prepare(`
       SELECT id FROM headlines
       WHERE id NOT IN (
-        SELECT id FROM (
-          SELECT id FROM headlines WHERE "column" = 'left' ORDER BY created_at DESC LIMIT ?
-          UNION ALL
-          SELECT id FROM headlines WHERE "column" = 'right' ORDER BY created_at DESC LIMIT ?
-          UNION ALL
-          SELECT id FROM headlines WHERE "column" = 'center' ORDER BY created_at DESC LIMIT ?
-        )
+        SELECT id FROM (SELECT id FROM headlines WHERE "column" = 'left' ORDER BY created_at DESC LIMIT ?)
+        UNION ALL
+        SELECT id FROM (SELECT id FROM headlines WHERE "column" = 'right' ORDER BY created_at DESC LIMIT ?)
+        UNION ALL
+        SELECT id FROM (SELECT id FROM headlines WHERE "column" = 'center' ORDER BY created_at DESC LIMIT ?)
       )
     `).all(keepCount, keepCount, keepCount) as { id: number }[];
 
     if (toDelete.length === 0) return 0;
 
     for (const { id } of toDelete) {
+      // Delete comments referencing this headline
+      db.prepare("DELETE FROM comments WHERE headline_id = ?").run(id);
+
       // Delete votes
       db.prepare("DELETE FROM votes WHERE headline_id = ?").run(id);
 
-      // Delete revenue events for tokens linked to this headline
+      // Delete revenue events, claim allocations, and volume snapshots for tokens linked to this headline
       const tokens = db.prepare("SELECT id FROM tokens WHERE headline_id = ?").all(id) as { id: number }[];
       for (const token of tokens) {
+        db.prepare("DELETE FROM claim_allocations WHERE token_id = ?").run(token.id);
+        db.prepare("DELETE FROM token_volume_snapshots WHERE token_id = ?").run(token.id);
         db.prepare("DELETE FROM revenue_events WHERE token_id = ?").run(token.id);
       }
 
@@ -1937,6 +1958,157 @@ export function getTopEarners(period: string = "all", limit: number = 15): TopEa
     LIMIT ?
   `);
   return stmt.all(limit) as TopEarner[];
+}
+
+// ============= DEPLOYER POOL =============
+
+/**
+ * Add a pre-funded wallet to the deployer pool.
+ */
+export function addPoolWallet(
+  address: string,
+  encryptedKey: string,
+  fundedLamports: number
+): PoolWallet {
+  const stmt = db.prepare(`
+    INSERT INTO deployer_pool (address, encrypted_key, funded_lamports, funded_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+  `);
+  const result = stmt.run(address, encryptedKey, fundedLamports);
+  return getPoolWalletById(result.lastInsertRowid as number)!;
+}
+
+/**
+ * Atomically claim the oldest eligible "ready" wallet from the pool.
+ * Respects WALLET_POOL_MIN_AGE_MINUTES — only wallets funded at least
+ * that many minutes ago are eligible.
+ *
+ * Returns the claimed wallet (now in "reserved" status) or null if the pool is empty.
+ */
+export function claimPoolWallet(minAgeMinutes: number = 0): PoolWallet | null {
+  const claim = db.transaction(() => {
+    const ageFilter = minAgeMinutes > 0
+      ? `AND funded_at <= datetime('now', '-${Math.floor(minAgeMinutes)} minutes')`
+      : "";
+
+    const wallet = db.prepare(`
+      SELECT * FROM deployer_pool
+      WHERE status = 'ready'
+        ${ageFilter}
+      ORDER BY funded_at ASC
+      LIMIT 1
+    `).get() as PoolWallet | undefined;
+
+    if (!wallet) return null;
+
+    db.prepare(`
+      UPDATE deployer_pool
+      SET status = 'reserved', reserved_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(wallet.id);
+
+    return { ...wallet, status: "reserved" as const, reserved_at: new Date().toISOString() };
+  });
+
+  return claim();
+}
+
+/**
+ * Mark a pool wallet as successfully used after deployment.
+ */
+export function markPoolWalletUsed(id: number, tokenId?: number): boolean {
+  const stmt = db.prepare(`
+    UPDATE deployer_pool
+    SET status = 'used', used_at = CURRENT_TIMESTAMP, token_id = ?
+    WHERE id = ?
+  `);
+  const result = stmt.run(tokenId ?? null, id);
+  return result.changes > 0;
+}
+
+/**
+ * Mark a pool wallet as failed (deployment errored; SOL may still be on-chain).
+ */
+export function markPoolWalletFailed(id: number): boolean {
+  const stmt = db.prepare(`
+    UPDATE deployer_pool
+    SET status = 'failed', used_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  const result = stmt.run(id);
+  return result.changes > 0;
+}
+
+/**
+ * Get a pool wallet by ID.
+ */
+export function getPoolWalletById(id: number): PoolWallet | null {
+  const stmt = db.prepare(`SELECT * FROM deployer_pool WHERE id = ?`);
+  return (stmt.get(id) as PoolWallet) ?? null;
+}
+
+/**
+ * Get pool wallet counts by status.
+ */
+export function getPoolStats(): PoolStats {
+  const rows = db.prepare(`
+    SELECT status, COUNT(*) as cnt FROM deployer_pool GROUP BY status
+  `).all() as Array<{ status: string; cnt: number }>;
+
+  const stats: PoolStats = { ready: 0, reserved: 0, used: 0, failed: 0, total: 0 };
+  for (const row of rows) {
+    if (row.status === "ready") stats.ready = row.cnt;
+    else if (row.status === "reserved") stats.reserved = row.cnt;
+    else if (row.status === "used") stats.used = row.cnt;
+    else if (row.status === "failed") stats.failed = row.cnt;
+    stats.total += row.cnt;
+  }
+  return stats;
+}
+
+/**
+ * Reset stale reservations back to "ready".
+ * Wallets stuck in "reserved" for longer than `timeoutMinutes` are assumed
+ * to be from a crashed deployment and are released back to the pool.
+ *
+ * Returns the number of wallets reset.
+ */
+export function resetStaleReservations(timeoutMinutes: number = 30): number {
+  const stmt = db.prepare(`
+    UPDATE deployer_pool
+    SET status = 'ready', reserved_at = NULL
+    WHERE status = 'reserved'
+      AND reserved_at <= datetime('now', '-' || ? || ' minutes')
+  `);
+  const result = stmt.run(timeoutMinutes);
+  return result.changes;
+}
+
+/**
+ * Get all pool wallets that may still hold SOL on-chain (for sweep recovery).
+ * Returns wallets in "ready", "reserved", or "failed" status.
+ */
+export function getRecoverablePoolWallets(): PoolWallet[] {
+  const stmt = db.prepare(`
+    SELECT * FROM deployer_pool
+    WHERE status IN ('ready', 'reserved', 'failed')
+    ORDER BY funded_at ASC
+  `);
+  return stmt.all() as PoolWallet[];
+}
+
+/**
+ * Mark a pool wallet as used (swept/drained) so it's not reused.
+ * Used by the sweep-pool script after recovering SOL.
+ */
+export function markPoolWalletSwept(id: number): boolean {
+  const stmt = db.prepare(`
+    UPDATE deployer_pool
+    SET status = 'used', used_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  const result = stmt.run(id);
+  return result.changes > 0;
 }
 
 export default db;

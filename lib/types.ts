@@ -261,6 +261,7 @@ export type ActivityEventType =
   | "validation_started"
   | "approved"
   | "rejected"
+  | "not_selected"
   | "token_minted"
   | "headline_published"
   | "vote_cast";
@@ -271,6 +272,31 @@ export interface ActivityEvent {
   message: string;
   metadata: string | null;
   created_at: string;
+}
+
+// ============= DEPLOYER POOL TYPES =============
+
+export type PoolWalletStatus = "ready" | "reserved" | "used" | "failed";
+
+export interface PoolWallet {
+  id: number;
+  address: string;
+  encrypted_key: string;
+  funded_at: string;
+  funded_lamports: number;
+  status: PoolWalletStatus;
+  reserved_at: string | null;
+  used_at: string | null;
+  token_id: number | null;
+  created_at: string;
+}
+
+export interface PoolStats {
+  ready: number;
+  reserved: number;
+  used: number;
+  failed: number;
+  total: number;
 }
 
 // ============= STATE MACHINE =============
