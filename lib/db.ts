@@ -2125,13 +2125,22 @@ export interface FinancialStats {
   claimBatchesGross: number;
   claimAllocationsSubmitterPaid: number;
   claimAllocationsRetained: number;
-  // Deployment costs
+  // Deployment costs (only wallets that actually deployed a token)
   deploymentCostLamports: number;
   deploymentCount: number;
+  // Total pool funding (ALL wallets — total SOL ever sent out to the pool)
+  totalPoolFundedLamports: number;
+  totalPoolFundedCount: number;
+  // Pool breakdown by status
+  poolReadyLamports: number;
+  poolReadyCount: number;
+  poolFailedLamports: number;
+  poolFailedCount: number;
   // Computed totals
   grossRevenue: number;
   totalPaidToSubmitters: number;
   totalRetained: number;
+  totalSpent: number;
   netProfit: number;
 }
 
@@ -2183,7 +2192,7 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
       ${dateFilter.replace(/created_at/g, "ca.created_at")}
   `).get() as { submitter_paid: number; retained: number };
 
-  // Deployment costs (used pool wallets)
+  // Deployment costs (used pool wallets — tokens actually deployed)
   const deployRow = db.prepare(`
     SELECT
       COUNT(*) as cnt,
@@ -2193,10 +2202,41 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
       ${dateFilter.replace(/created_at/g, "used_at")}
   `).get() as { cnt: number; cost: number };
 
+  // Total pool funding (ALL wallets — every lamport that ever left the master wallet for the pool)
+  const poolTotalRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(funded_lamports), 0) as total
+    FROM deployer_pool
+    WHERE 1=1
+      ${dateFilter.replace(/created_at/g, "funded_at")}
+  `).get() as { cnt: number; total: number };
+
+  // Pool wallets still holding SOL (ready + reserved = potentially recoverable)
+  const poolReadyRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(funded_lamports), 0) as total
+    FROM deployer_pool
+    WHERE status IN ('ready', 'reserved')
+      ${dateFilter.replace(/created_at/g, "funded_at")}
+  `).get() as { cnt: number; total: number };
+
+  // Pool wallets that failed (SOL may still be on-chain, partially recoverable)
+  const poolFailedRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(funded_lamports), 0) as total
+    FROM deployer_pool
+    WHERE status = 'failed'
+      ${dateFilter.replace(/created_at/g, "funded_at")}
+  `).get() as { cnt: number; total: number };
+
   const grossRevenue = revenueRow.gross + batchRow.gross;
   const totalPaidToSubmitters = revenueRow.submitter_paid + allocRow.submitter_paid;
   const totalRetained = revenueRow.retained + allocRow.retained;
-  const netProfit = totalRetained - deployRow.cost;
+  const totalSpent = totalPaidToSubmitters + poolTotalRow.total;
+  const netProfit = grossRevenue - totalSpent;
 
   return {
     period,
@@ -2210,9 +2250,16 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
     claimAllocationsRetained: allocRow.retained,
     deploymentCostLamports: deployRow.cost,
     deploymentCount: deployRow.cnt,
+    totalPoolFundedLamports: poolTotalRow.total,
+    totalPoolFundedCount: poolTotalRow.cnt,
+    poolReadyLamports: poolReadyRow.total,
+    poolReadyCount: poolReadyRow.cnt,
+    poolFailedLamports: poolFailedRow.total,
+    poolFailedCount: poolFailedRow.cnt,
     grossRevenue,
     totalPaidToSubmitters,
     totalRetained,
+    totalSpent,
     netProfit,
   };
 }

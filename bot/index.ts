@@ -1168,14 +1168,23 @@ bot.command("finances", async (ctx) => {
     let msg = `*FINANCIAL REPORT — ${periodLabel}*\n`;
     msg += `─────────────────────\n\n`;
 
-    msg += `*Gross Revenue:* \`${fmt(stats.grossRevenue)} SOL\`\n`;
+    msg += `*Revenue In:* \`${fmt(stats.grossRevenue)} SOL\`\n`;
     msg += `  Fee Claims: \`${fmt(stats.revenueEventsGross)} SOL\` (${stats.revenueEventsCount} events)\n`;
     msg += `  Bulk Claims: \`${fmt(stats.claimBatchesGross)} SOL\` (${stats.claimBatchesCount} batches)\n\n`;
 
-    msg += `*Paid to Submitters:* \`${fmt(stats.totalPaidToSubmitters)} SOL\`\n`;
-    msg += `*Our Revenue:* \`${fmt(stats.totalRetained)} SOL\`\n\n`;
+    msg += `*Total Spent:* \`${fmt(stats.totalSpent)} SOL\`\n`;
+    msg += `  Submitter Payouts: \`${fmt(stats.totalPaidToSubmitters)} SOL\`\n`;
+    msg += `  Pool Funding: \`${fmt(stats.totalPoolFundedLamports)} SOL\` (${stats.totalPoolFundedCount} wallets)\n`;
+    msg += `    Deployed: \`${fmt(stats.deploymentCostLamports)} SOL\` (${stats.deploymentCount})\n`;
+    if (stats.poolReadyCount > 0) {
+      msg += `    Ready/Reserved: \`${fmt(stats.poolReadyLamports)} SOL\` (${stats.poolReadyCount})\n`;
+    }
+    if (stats.poolFailedCount > 0) {
+      msg += `    Failed: \`${fmt(stats.poolFailedLamports)} SOL\` (${stats.poolFailedCount})\n`;
+    }
+    msg += `\n`;
 
-    msg += `*Deployment Costs:* \`${fmt(stats.deploymentCostLamports)} SOL\` (${stats.deploymentCount} deploys)\n`;
+    msg += `*Our Revenue:* \`${fmt(stats.totalRetained)} SOL\`\n`;
     msg += `*Net Profit:* \`${fmt(stats.netProfit)} SOL\``;
 
     await ctx.reply(msg, { parse_mode: "Markdown" });
