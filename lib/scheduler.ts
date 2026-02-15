@@ -23,6 +23,7 @@ import {
   updateHeadlineSummary,
   detectContentType,
   purgeStaleSubmissions,
+  cleanupOldHeadlines,
 } from "./db";
 import { validateSubmission, smartFetchContent } from "./ai-validator";
 import { generateTokenMetadata } from "./token-generator";
@@ -571,6 +572,14 @@ export async function runSchedulerCycle(): Promise<{
   const purged = purgeStaleSubmissions(72);
   if (purged > 0) {
     console.log(`[Scheduler] Purged ${purged} stale submission(s) older than 72h`);
+  }
+
+  // FIFO cleanup: keep 50 headlines per column, remove oldest beyond that.
+  // The homepage displays 72 sidebar headlines total, so 50 per column (100 left+right)
+  // is generous headroom while preventing unbounded growth.
+  const cleaned = cleanupOldHeadlines(50);
+  if (cleaned > 0) {
+    console.log(`[Scheduler] Cleaned up ${cleaned} old headline(s) (FIFO rotation)`);
   }
 
   const validated = await processValidationQueue();
