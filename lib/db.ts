@@ -2111,4 +2111,110 @@ export function markPoolWalletSwept(id: number): boolean {
   return result.changes > 0;
 }
 
+// ============= FINANCIAL STATISTICS =============
+
+export interface FinancialStats {
+  period: string;
+  // Revenue events (per-token ephemeral wallet claims)
+  revenueEventsCount: number;
+  revenueEventsGross: number;
+  revenueEventsSubmitterPaid: number;
+  revenueEventsRetained: number;
+  // Claim batches (bulk master-wallet claims)
+  claimBatchesCount: number;
+  claimBatchesGross: number;
+  claimAllocationsSubmitterPaid: number;
+  claimAllocationsRetained: number;
+  // Deployment costs
+  deploymentCostLamports: number;
+  deploymentCount: number;
+  // Computed totals
+  grossRevenue: number;
+  totalPaidToSubmitters: number;
+  totalRetained: number;
+  netProfit: number;
+}
+
+/**
+ * Get comprehensive financial statistics for a given time period.
+ * Combines data from revenue_events, claim_batches/allocations, and deployer_pool.
+ *
+ * @param period - 'day' | 'week' | 'all'
+ */
+export function getFinancialStats(period: string = "all"): FinancialStats {
+  let dateFilter = "";
+  if (period === "day") {
+    dateFilter = "AND created_at >= datetime('now', '-1 day')";
+  } else if (period === "week") {
+    dateFilter = "AND created_at >= datetime('now', '-7 days')";
+  }
+
+  // Revenue events (ephemeral wallet per-token claims)
+  const revenueRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(amount_lamports), 0) as gross,
+      COALESCE(SUM(submitter_share_lamports), 0) as submitter_paid,
+      COALESCE(SUM(burn_share_lamports), 0) as retained
+    FROM revenue_events
+    WHERE status IN ('submitter_paid', 'completed')
+      ${dateFilter}
+  `).get() as { cnt: number; gross: number; submitter_paid: number; retained: number };
+
+  // Claim batches (bulk pump.fun claims)
+  const batchRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(total_lamports), 0) as gross
+    FROM claim_batches
+    WHERE status = 'completed'
+      ${dateFilter}
+  `).get() as { cnt: number; gross: number };
+
+  // Claim allocations (paid submitter shares from bulk claims)
+  const allocRow = db.prepare(`
+    SELECT
+      COALESCE(SUM(submitter_lamports), 0) as submitter_paid,
+      COALESCE(SUM(amount_lamports - submitter_lamports), 0) as retained
+    FROM claim_allocations ca
+    JOIN claim_batches cb ON ca.batch_id = cb.id
+    WHERE ca.status = 'paid'
+      AND cb.status = 'completed'
+      ${dateFilter.replace(/created_at/g, "ca.created_at")}
+  `).get() as { submitter_paid: number; retained: number };
+
+  // Deployment costs (used pool wallets)
+  const deployRow = db.prepare(`
+    SELECT
+      COUNT(*) as cnt,
+      COALESCE(SUM(funded_lamports), 0) as cost
+    FROM deployer_pool
+    WHERE status = 'used'
+      ${dateFilter.replace(/created_at/g, "used_at")}
+  `).get() as { cnt: number; cost: number };
+
+  const grossRevenue = revenueRow.gross + batchRow.gross;
+  const totalPaidToSubmitters = revenueRow.submitter_paid + allocRow.submitter_paid;
+  const totalRetained = revenueRow.retained + allocRow.retained;
+  const netProfit = totalRetained - deployRow.cost;
+
+  return {
+    period,
+    revenueEventsCount: revenueRow.cnt,
+    revenueEventsGross: revenueRow.gross,
+    revenueEventsSubmitterPaid: revenueRow.submitter_paid,
+    revenueEventsRetained: revenueRow.retained,
+    claimBatchesCount: batchRow.cnt,
+    claimBatchesGross: batchRow.gross,
+    claimAllocationsSubmitterPaid: allocRow.submitter_paid,
+    claimAllocationsRetained: allocRow.retained,
+    deploymentCostLamports: deployRow.cost,
+    deploymentCount: deployRow.cnt,
+    grossRevenue,
+    totalPaidToSubmitters,
+    totalRetained,
+    netProfit,
+  };
+}
+
 export default db;

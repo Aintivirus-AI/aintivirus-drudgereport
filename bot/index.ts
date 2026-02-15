@@ -47,6 +47,7 @@ import {
   getSetting,
   setSetting,
   purgeStaleSubmissions,
+  getFinancialStats,
 } from "../lib/db";
 import { generateMcAfeeTake, scoreHeadlineImportance, generateCoinSummary } from "../lib/mcafee-commentator";
 
@@ -696,6 +697,7 @@ bot.command("start", async (ctx) => {
       msg += `/adduser — Add to whitelist\n`;
       msg += `/removeuser — Remove from whitelist\n`;
       msg += `/queue — Submission queue\n`;
+      msg += `/finances — Financial statistics\n`;
     }
   }
 
@@ -738,6 +740,7 @@ bot.command("help", async (ctx) => {
     msg += `/adduser <id> [username] — Add to whitelist\n`;
     msg += `/removeuser <id> — Remove from whitelist\n`;
     msg += `/queue — View pending submission queue\n`;
+    msg += `/finances [day|week|all] — Financial statistics\n`;
   }
 
   msg += `\n${API_URL}`;
@@ -1127,6 +1130,58 @@ bot.command("mayhem", async (ctx) => {
       `*Mayhem Mode:* ${current ? "ON" : "OFF"}\n\nUsage: \`/mayhem on\` or \`/mayhem off\``,
       { parse_mode: "Markdown" }
     );
+  }
+});
+
+// /finances (admin) — financial statistics
+bot.command("finances", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId || !isAdmin(userId)) {
+    await ctx.reply("Admin only.");
+    return;
+  }
+
+  const args = ctx.message?.text?.split(" ").slice(1);
+  const period = args?.[0]?.toLowerCase() || "all";
+
+  if (!["day", "week", "all"].includes(period)) {
+    await ctx.reply(
+      "Usage: `/finances [day|week|all]`\nDefault: all time",
+      { parse_mode: "Markdown" }
+    );
+    return;
+  }
+
+  try {
+    const LAMPORTS_PER_SOL = 1_000_000_000;
+    const stats = getFinancialStats(period);
+
+    const fmt = (lamports: number): string => {
+      return (lamports / LAMPORTS_PER_SOL).toFixed(4);
+    };
+
+    const periodLabel =
+      period === "day" ? "Today (24h)" :
+      period === "week" ? "This Week (7d)" :
+      "All Time";
+
+    let msg = `*FINANCIAL REPORT — ${periodLabel}*\n`;
+    msg += `─────────────────────\n\n`;
+
+    msg += `*Gross Revenue:* \`${fmt(stats.grossRevenue)} SOL\`\n`;
+    msg += `  Fee Claims: \`${fmt(stats.revenueEventsGross)} SOL\` (${stats.revenueEventsCount} events)\n`;
+    msg += `  Bulk Claims: \`${fmt(stats.claimBatchesGross)} SOL\` (${stats.claimBatchesCount} batches)\n\n`;
+
+    msg += `*Paid to Submitters:* \`${fmt(stats.totalPaidToSubmitters)} SOL\`\n`;
+    msg += `*Our Revenue:* \`${fmt(stats.totalRetained)} SOL\`\n\n`;
+
+    msg += `*Deployment Costs:* \`${fmt(stats.deploymentCostLamports)} SOL\` (${stats.deploymentCount} deploys)\n`;
+    msg += `*Net Profit:* \`${fmt(stats.netProfit)} SOL\``;
+
+    await ctx.reply(msg, { parse_mode: "Markdown" });
+  } catch (error) {
+    console.error("Error fetching financial stats:", error);
+    await ctx.reply("Failed to fetch financial statistics.");
   }
 });
 
