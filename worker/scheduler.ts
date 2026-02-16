@@ -42,7 +42,6 @@ if (!envLoaded) {
 let isRunning = false;
 let isProcessingRevenue = false;
 let isClaimingFees = false;
-let isMaintainingPool = false;
 let cycleCount = 0;
 let isShuttingDown = false;
 
@@ -54,9 +53,6 @@ let runSchedulerCycle: typeof import("../lib/scheduler")["runSchedulerCycle"];
 let getSchedulerStatus: typeof import("../lib/scheduler")["getSchedulerStatus"];
 let processPendingRevenue: typeof import("../lib/revenue-distributor")["processPendingRevenue"];
 let claimAllCreatorFees: typeof import("../lib/creator-fee-claimer")["claimAllCreatorFees"];
-let fundPoolWallets: typeof import("../lib/pool-manager")["fundPoolWallets"];
-let sweepPoolWallets: typeof import("../lib/pool-manager")["sweepPoolWallets"];
-let getPoolStats: typeof import("../lib/pool-manager")["getPoolStats"];
 
 /**
  * Run a scheduler cycle (called every 10 minutes by cron).
@@ -142,74 +138,17 @@ async function safeClaimCreatorFees(): Promise<void> {
   }
 }
 
-/**
- * Maintain the deployer wallet pool: auto-refill + recover stranded SOL.
- */
-async function safePoolMaintenance(): Promise<void> {
-  if (isMaintainingPool || isShuttingDown) {
-    console.log("[Worker] Pool maintenance already running or shutting down, skipping...");
-    return;
-  }
-
-  isMaintainingPool = true;
-  try {
-    const targetSize = parseInt(process.env.WALLET_POOL_TARGET_SIZE || "10", 10);
-    const stats = getPoolStats();
-
-    console.log(
-      `[Worker] Pool status: ${stats.ready} ready, ${stats.reserved} reserved, ` +
-      `${stats.failed} failed, ${stats.total} total`
-    );
-
-    // Recovery: sweep failed wallets to reclaim stranded SOL
-    if (stats.failed > 0) {
-      console.log(`[Worker] Sweeping ${stats.failed} failed pool wallet(s)...`);
-      const sweepResult = await sweepPoolWallets({ statusFilter: ["failed"] });
-      if (sweepResult.swept > 0 || sweepResult.failed > 0) {
-        console.log(
-          `[Worker] Pool sweep: ${sweepResult.swept} swept (${sweepResult.totalSolRecovered.toFixed(6)} SOL), ` +
-          `${sweepResult.failed} failed`
-        );
-      }
-    }
-
-    // Refill: if pool is below half the target, fund new wallets up to the target
-    const refillThreshold = Math.floor(targetSize / 2);
-    if (stats.ready < refillThreshold) {
-      const toFund = targetSize - stats.ready;
-      console.log(
-        `[Worker] Pool low (${stats.ready}/${targetSize} ready), funding ${toFund} wallet(s)...`
-      );
-      const fundResult = await fundPoolWallets(toFund);
-      if (fundResult.funded > 0 || fundResult.failed > 0) {
-        console.log(
-          `[Worker] Pool refill: ${fundResult.funded} funded (${fundResult.totalSolSpent.toFixed(4)} SOL), ` +
-          `${fundResult.failed} failed`
-        );
-      }
-    }
-  } catch (error) {
-    console.error("[Worker] Pool maintenance error:", error);
-  } finally {
-    isMaintainingPool = false;
-  }
-}
-
 // Main function
 async function main(): Promise<void> {
   // Dynamic imports: app modules are loaded HERE, after dotenv has run.
   const scheduler = await import("../lib/scheduler");
   const revenue = await import("../lib/revenue-distributor");
   const feeClaimer = await import("../lib/creator-fee-claimer");
-  const poolManager = await import("../lib/pool-manager");
 
   runSchedulerCycle = scheduler.runSchedulerCycle;
   getSchedulerStatus = scheduler.getSchedulerStatus;
   processPendingRevenue = revenue.processPendingRevenue;
   claimAllCreatorFees = feeClaimer.claimAllCreatorFees;
-  fundPoolWallets = poolManager.fundPoolWallets;
-  sweepPoolWallets = poolManager.sweepPoolWallets;
-  getPoolStats = poolManager.getPoolStats;
 
   console.log("🚀 Starting News Token Scheduler Worker");
   console.log(`📊 Initial status: ${JSON.stringify(getSchedulerStatus())}`);
@@ -218,7 +157,6 @@ async function main(): Promise<void> {
   await safeRunCycle();
   safeProcessRevenue().catch(() => {});
   safeClaimCreatorFees().catch(() => {});
-  safePoolMaintenance().catch(() => {});
 
   // Fixed 10-minute publishing cycle: 1 article per cycle = 6/hour, 144/day
   const publishingTask = cron.schedule("*/10 * * * *", async () => {
@@ -232,23 +170,16 @@ async function main(): Promise<void> {
   });
   cronTasks.push(revenueTask);
 
-  // Creator fee claiming from ephemeral deployer wallets (every 30 minutes)
+  // Creator fee claiming from master wallet (every 30 minutes)
   const feeClaimTask = cron.schedule("*/30 * * * *", async () => {
     await safeClaimCreatorFees();
   });
   cronTasks.push(feeClaimTask);
 
-  // Deployer pool maintenance: auto-refill + recover stranded SOL (every 30 minutes)
-  const poolTask = cron.schedule("*/30 * * * *", async () => {
-    await safePoolMaintenance();
-  });
-  cronTasks.push(poolTask);
-
   console.log("⏰ Scheduler started:");
   console.log("   - Publishing:  every 10 minutes (6/hour, 144/day)");
   console.log("   - Revenue:     every 5 minutes");
   console.log("   - Fee claims:  every 30 minutes");
-  console.log("   - Pool maint:  every 30 minutes");
   console.log("   Press Ctrl+C to stop\n");
 
   // Graceful shutdown — waits for in-progress work to complete
@@ -266,12 +197,12 @@ async function main(): Promise<void> {
     // Wait for in-progress work (max 30 seconds)
     const maxWaitMs = 30_000;
     const startWait = Date.now();
-    while ((isRunning || isProcessingRevenue || isClaimingFees || isMaintainingPool) && Date.now() - startWait < maxWaitMs) {
+    while ((isRunning || isProcessingRevenue || isClaimingFees) && Date.now() - startWait < maxWaitMs) {
       console.log("[Worker] Waiting for in-progress work to complete...");
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (isRunning || isProcessingRevenue || isClaimingFees || isMaintainingPool) {
+    if (isRunning || isProcessingRevenue || isClaimingFees) {
       console.warn("[Worker] Timed out waiting for in-progress work — exiting anyway");
     }
 
