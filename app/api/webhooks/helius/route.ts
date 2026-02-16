@@ -17,8 +17,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getTokenByMintAddress, isKnownCreatorWallet } from "@/lib/db";
-import { recordAndDistributeRevenue } from "@/lib/revenue-distributor";
-import { distributeBulkClaim } from "@/lib/claim-distributor";
 import { safeCompare } from "@/lib/auth";
 
 const MASTER_WALLET = process.env.MASTER_WALLET_PUBLIC_KEY || "";
@@ -26,10 +24,6 @@ const MASTER_WALLET = process.env.MASTER_WALLET_PUBLIC_KEY || "";
 // Minimum amount to process (avoid dust transactions)
 const MIN_REVENUE_LAMPORTS = 10_000; // 0.00001 SOL
 
-// Threshold for treating an unmatched transfer as a bulk pump.fun claim (configurable)
-const BULK_CLAIM_THRESHOLD = Math.floor(
-  parseFloat(process.env.BULK_CLAIM_THRESHOLD_SOL || "0.01") * LAMPORTS_PER_SOL
-);
 
 // Addresses to IGNORE incoming transfers from (e.g. your personal wallets used to top off).
 // Comma-separated in .env.local: WEBHOOK_IGNORE_SENDERS=addr1,addr2
@@ -267,68 +261,15 @@ export async function POST(request: NextRequest) {
           `[HeliusWebhook] Incoming: ${transfer.lamports / LAMPORTS_PER_SOL} SOL`
         );
 
-        // Try to match to a token
+        // Log only — no automatic distribution.
+        // Fees are claimed every 30 min by the fee claimer and kept in the master wallet.
         const tokenId = matchToToken(transfer);
-
-        if (tokenId) {
-          console.log(
-            `[HeliusWebhook] Matched to token #${tokenId}, distributing revenue...`
-          );
-
-          try {
-            const result = await recordAndDistributeRevenue(
-              tokenId,
-              transfer.lamports
-            );
-
-            if (result.success) {
-              distributed++;
-              console.log(
-                `[HeliusWebhook] Revenue distributed for token #${tokenId}`
-              );
-            } else {
-              console.error(
-                `[HeliusWebhook] Distribution failed: ${result.error}`
-              );
-            }
-          } catch (distError) {
-            console.error(
-              `[HeliusWebhook] Distribution error:`,
-              distError
-            );
-          }
-        } else if (transfer.lamports >= BULK_CLAIM_THRESHOLD) {
-          // Likely a pump.fun bulk claim — distribute pro-rata across all tokens
-          console.log(
-            `[HeliusWebhook] Unmatched bulk transfer (${transfer.lamports / LAMPORTS_PER_SOL} SOL), ` +
-            `routing to claim distributor…`
-          );
-          try {
-            const claimResult = await distributeBulkClaim(
-              tx.signature,
-              transfer.lamports
-            );
-            if (claimResult.success) {
-              distributed++;
-              console.log(
-                `[HeliusWebhook] Bulk claim distributed across ${claimResult.tokensCount} token(s)`
-              );
-            } else {
-              console.error(
-                `[HeliusWebhook] Bulk claim distribution failed: ${claimResult.error}`
-              );
-            }
-          } catch (claimError) {
-            console.error(
-              `[HeliusWebhook] Bulk claim distribution error:`,
-              claimError
-            );
-          }
-        } else {
-          console.log(
-            `[HeliusWebhook] Unmatched small transfer (${transfer.lamports / LAMPORTS_PER_SOL} SOL), skipping`
-          );
-        }
+        console.log(
+          `[HeliusWebhook] Incoming ${transfer.lamports / LAMPORTS_PER_SOL} SOL ` +
+          `from ${transfer.fromAddress.slice(0, 8)}… ` +
+          (tokenId ? `(matched token #${tokenId})` : "(unmatched)") +
+          ` — logged, no auto-distribution`
+        );
       }
     }
 
