@@ -31,6 +31,15 @@ const BULK_CLAIM_THRESHOLD = Math.floor(
   parseFloat(process.env.BULK_CLAIM_THRESHOLD_SOL || "0.01") * LAMPORTS_PER_SOL
 );
 
+// Addresses to IGNORE incoming transfers from (e.g. your personal wallets used to top off).
+// Comma-separated in .env.local: WEBHOOK_IGNORE_SENDERS=addr1,addr2
+const IGNORED_SENDERS = new Set(
+  (process.env.WEBHOOK_IGNORE_SENDERS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
+
 // Replay protection: track processed transaction signatures
 const processedSignatures = new Map<string, number>(); // signature → timestamp
 const MAX_PROCESSED_SIGNATURES = 10_000;
@@ -239,10 +248,17 @@ export async function POST(request: NextRequest) {
 
       for (const transfer of transfers) {
         // Skip internal sweeps from ephemeral deployer wallets
-        // (these are handled by the creator-fee-claimer, not the webhook)
         if (isKnownCreatorWallet(transfer.fromAddress)) {
           console.log(
             `[HeliusWebhook] Skipping internal sweep from deployer wallet ${transfer.fromAddress.slice(0, 8)}…`
+          );
+          continue;
+        }
+
+        // Skip transfers from ignored senders (personal wallets used to top off)
+        if (IGNORED_SENDERS.has(transfer.fromAddress)) {
+          console.log(
+            `[HeliusWebhook] Skipping top-off deposit from ignored sender ${transfer.fromAddress.slice(0, 8)}… (${transfer.lamports / LAMPORTS_PER_SOL} SOL)`
           );
           continue;
         }
