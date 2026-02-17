@@ -48,6 +48,7 @@ import {
   setSetting,
   purgeStaleSubmissions,
   getFinancialStats,
+  getVisitStats,
 } from "../lib/db";
 import { generateMcAfeeTake, scoreHeadlineImportance, generateCoinSummary } from "../lib/mcafee-commentator";
 
@@ -698,6 +699,7 @@ bot.command("start", async (ctx) => {
       msg += `/removeuser — Remove from whitelist\n`;
       msg += `/queue — Submission queue\n`;
       msg += `/finances — Financial statistics\n`;
+      msg += `/visits — Visit statistics\n`;
     }
   }
 
@@ -741,6 +743,7 @@ bot.command("help", async (ctx) => {
     msg += `/removeuser <id> — Remove from whitelist\n`;
     msg += `/queue — View pending submission queue\n`;
     msg += `/finances [day|week|all] — Financial statistics\n`;
+    msg += `/visits — Page view stats (today/week/month)\n`;
   }
 
   msg += `\n${API_URL}`;
@@ -1189,6 +1192,32 @@ bot.command("finances", async (ctx) => {
   } catch (error) {
     console.error("Error fetching financial stats:", error);
     await ctx.reply("Failed to fetch financial statistics.");
+  }
+});
+
+// /visits (admin) — page view statistics
+bot.command("visits", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId || !isAdmin(userId)) {
+    await ctx.reply("Admin only.");
+    return;
+  }
+
+  try {
+    const stats = getVisitStats();
+
+    const fmtNum = (n: number): string => n.toLocaleString("en-US");
+
+    let msg = `*VISIT STATS*\n`;
+    msg += `─────────────────────\n\n`;
+    msg += `*Today:*      \`${fmtNum(stats.today)}\` views (${fmtNum(stats.uniqueToday)} unique)\n`;
+    msg += `*This Week:*  \`${fmtNum(stats.week)}\` views (${fmtNum(stats.uniqueWeek)} unique)\n`;
+    msg += `*This Month:* \`${fmtNum(stats.month)}\` views (${fmtNum(stats.uniqueMonth)} unique)\n`;
+
+    await ctx.reply(msg, { parse_mode: "Markdown" });
+  } catch (error) {
+    console.error("Error fetching visit stats:", error);
+    await ctx.reply("Failed to fetch visit statistics.");
   }
 });
 

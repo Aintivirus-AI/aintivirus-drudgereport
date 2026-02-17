@@ -234,6 +234,16 @@ db.exec(`
     token_id INTEGER REFERENCES tokens(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Page view tracking (deduped per visitor per path per day)
+  CREATE TABLE IF NOT EXISTS page_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_path TEXT NOT NULL,
+    visitor_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_page_views_created_at ON page_views(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_page_views_path ON page_views(page_path);
 `);
 
 // Migration: Add image_url column if it doesn't exist
@@ -297,6 +307,13 @@ try {
   db.exec(`ALTER TABLE tokens ADD COLUMN theme TEXT`);
 } catch {
   // Column already exists
+}
+
+// Migration: dedup index for page_views (expression index, safe to retry)
+try {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_page_views_dedup ON page_views(page_path, visitor_hash, date(created_at))`);
+} catch {
+  // Index already exists or table not yet created
 }
 
 // Insert default main headline if none exists
@@ -2261,6 +2278,68 @@ export function getFinancialStats(period: string = "all"): FinancialStats {
     totalRetained,
     totalSpent,
     netProfit,
+  };
+}
+
+// ============= PAGE VIEW TRACKING =============
+
+/**
+ * Record a page view. Uses INSERT OR IGNORE with the dedup index
+ * to allow at most one row per (path, visitor, day).
+ * Returns true if a new row was inserted.
+ */
+export function recordPageView(pagePath: string, visitorHash: string): boolean {
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO page_views (page_path, visitor_hash)
+    VALUES (?, ?)
+  `);
+  const result = stmt.run(pagePath, visitorHash);
+  return result.changes > 0;
+}
+
+export interface VisitStats {
+  today: number;
+  week: number;
+  month: number;
+  uniqueToday: number;
+  uniqueWeek: number;
+  uniqueMonth: number;
+}
+
+/**
+ * Get visit statistics for today, this week (7 days), and this month (30 days).
+ * Returns both total page views and unique visitor counts for each period.
+ */
+export function getVisitStats(): VisitStats {
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0) as today,
+      COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0) as week,
+      COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) as month
+    FROM page_views
+    WHERE created_at >= datetime('now', '-30 days')
+  `).get() as { today: number; week: number; month: number };
+
+  const uniqueRow = db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN min_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0) as uniqueToday,
+      COALESCE(SUM(CASE WHEN min_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0) as uniqueWeek,
+      COALESCE(SUM(CASE WHEN min_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) as uniqueMonth
+    FROM (
+      SELECT visitor_hash, MIN(created_at) as min_at
+      FROM page_views
+      WHERE created_at >= datetime('now', '-30 days')
+      GROUP BY visitor_hash
+    )
+  `).get() as { uniqueToday: number; uniqueWeek: number; uniqueMonth: number };
+
+  return {
+    today: row.today,
+    week: row.week,
+    month: row.month,
+    uniqueToday: uniqueRow.uniqueToday,
+    uniqueWeek: uniqueRow.uniqueWeek,
+    uniqueMonth: uniqueRow.uniqueMonth,
   };
 }
 

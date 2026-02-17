@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Space_Grotesk, Syne } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PageViewTracker } from "@/components/PageViewTracker";
 
 // Self-host fonts via next/font (privacy-safe: no user data sent to Google)
 const jetbrainsMono = JetBrains_Mono({
@@ -89,6 +90,7 @@ export default function RootLayout({
           }}
         />
         <ThemeProvider>
+          <PageViewTracker />
           {children}
         </ThemeProvider>
       </body>
