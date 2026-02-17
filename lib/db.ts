@@ -1946,31 +1946,63 @@ export interface TopEarner {
 
 /**
  * Get top earners by SOL earned, with an optional time period filter.
+ * Combines both revenue_events (individual distributions) and
+ * claim_allocations (bulk pump.fun claim distributions).
  * @param period - 'day' | 'week' | 'month' | 'all'
  */
 export function getTopEarners(period: string = "all", limit: number = 15): TopEarner[] {
-  let dateFilter = "";
+  let reDateFilter = "";
+  let caDateFilter = "";
   if (period === "day") {
-    dateFilter = "AND re.created_at >= datetime('now', '-1 day')";
+    reDateFilter = "AND re.created_at >= datetime('now', '-1 day')";
+    caDateFilter = "AND ca.created_at >= datetime('now', '-1 day')";
   } else if (period === "week") {
-    dateFilter = "AND re.created_at >= datetime('now', '-7 days')";
+    reDateFilter = "AND re.created_at >= datetime('now', '-7 days')";
+    caDateFilter = "AND ca.created_at >= datetime('now', '-7 days')";
   } else if (period === "month") {
-    dateFilter = "AND re.created_at >= datetime('now', '-30 days')";
+    reDateFilter = "AND re.created_at >= datetime('now', '-30 days')";
+    caDateFilter = "AND ca.created_at >= datetime('now', '-30 days')";
   }
 
   const stmt = db.prepare(`
     SELECT
-      s.telegram_username,
-      s.telegram_user_id,
-      s.sol_address,
-      SUM(re.submitter_share_lamports) as total_earned_lamports,
-      COUNT(DISTINCT re.id) as revenue_events_count
-    FROM revenue_events re
-    JOIN tokens t ON re.token_id = t.id
-    JOIN submissions s ON t.submission_id = s.id
-    WHERE re.status IN ('submitter_paid', 'completed')
-      ${dateFilter}
-    GROUP BY s.telegram_user_id
+      telegram_username,
+      telegram_user_id,
+      sol_address,
+      SUM(earned_lamports) as total_earned_lamports,
+      SUM(event_count) as revenue_events_count
+    FROM (
+      -- Revenue events (individual token distributions)
+      SELECT
+        s.telegram_username,
+        s.telegram_user_id,
+        s.sol_address,
+        re.submitter_share_lamports as earned_lamports,
+        1 as event_count
+      FROM revenue_events re
+      JOIN tokens t ON re.token_id = t.id
+      JOIN submissions s ON t.submission_id = s.id
+      WHERE re.status IN ('submitter_paid', 'completed')
+        ${reDateFilter}
+
+      UNION ALL
+
+      -- Claim allocations (bulk pump.fun claim distributions)
+      SELECT
+        s.telegram_username,
+        s.telegram_user_id,
+        s.sol_address,
+        ca.submitter_lamports as earned_lamports,
+        1 as event_count
+      FROM claim_allocations ca
+      JOIN claim_batches cb ON ca.batch_id = cb.id
+      JOIN tokens t ON ca.token_id = t.id
+      JOIN submissions s ON t.submission_id = s.id
+      WHERE ca.status = 'paid'
+        AND cb.status = 'completed'
+        ${caDateFilter}
+    ) combined
+    GROUP BY telegram_user_id
     ORDER BY total_earned_lamports DESC
     LIMIT ?
   `);
