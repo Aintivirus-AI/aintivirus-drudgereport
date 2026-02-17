@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface EarnModalProps {
   open: boolean;
@@ -9,6 +10,12 @@ interface EarnModalProps {
 
 export function EarnModal({ open, onClose }: EarnModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Wait for client mount so createPortal has a target
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -32,9 +39,9 @@ export function EarnModal({ open, onClose }: EarnModalProps) {
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       ref={backdropRef}
       className="earn-modal-backdrop"
@@ -139,6 +146,7 @@ export function EarnModal({ open, onClose }: EarnModalProps) {
           After opening the bot, type <code className="text-neon-cyan/60 font-mono">/submit</code> and follow the prompts. That&apos;s it.
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
