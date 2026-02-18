@@ -129,7 +129,9 @@ export async function notifySubmitterApproved(opts: {
     `${safeTitle}\n\n` +
     `Your submission has been approved and is now in the publishing queue\\.\n` +
     `You'll receive another notification once it's live with a token launch\\.\n\n` +
-    `_Submission \\#${submissionId}_`;
+    `_Submission \\#${submissionId}_\n\n` +
+    `─────────────────────\n` +
+    `_The McAfee Report is powered by [AIntivirus](https://aintivirus.ai)\\. Check out more products at [aintivirus\\.ai](https://aintivirus.ai)_`;
 
   const sent = await sendTelegramMessage(telegramUserId, message);
   if (sent) {
@@ -162,7 +164,9 @@ export async function notifySubmitterRejected(opts: {
     `URL: \`${safeUrl}\`\n` +
     `Reason: ${safeReason}\n\n` +
     `Don't worry — you can submit another link with /submit\\.\n\n` +
-    `_Submission \\#${submissionId}_`;
+    `_Submission \\#${submissionId}_\n\n` +
+    `─────────────────────\n` +
+    `_The McAfee Report is powered by [AIntivirus](https://aintivirus.ai)\\. Check out more products at [aintivirus\\.ai](https://aintivirus.ai)_`;
 
   const sent = await sendTelegramMessage(telegramUserId, message);
   if (sent) {

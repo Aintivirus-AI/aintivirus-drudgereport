@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { BreakingSiren } from "@/components/BreakingSiren";
 import { getSidebarHeadlines, getMainHeadline, getBreakingHeadline } from "@/lib/db";
 import { MayhemBanner } from "@/components/MayhemBanner";
+import { Footer } from "@/components/Footer";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -83,6 +84,8 @@ export default function Home() {
 
         {/* Live Activity Feed moved to /analytics */}
       </div>
+
+      <Footer />
     </main>
   );
 }

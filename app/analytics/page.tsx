@@ -56,6 +56,12 @@ export default function AnalyticsPage() {
           <SentimentMeter alwaysShow />
         </div>
 
+        {/* How to Earn CTA */}
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-white mb-4 text-center">Want to be on this leaderboard?</h3>
+          <SubmitCTA />
+        </div>
+
         {/* Leaderboard Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Top Submitters */}
@@ -114,56 +120,62 @@ export default function AnalyticsPage() {
               <p className="text-gray-500 text-sm py-8 text-center">No tokens launched yet.</p>
             ) : (
               <div className="space-y-2">
-                {recentLaunches.map((launch) => (
-                  <div
-                    key={launch.token_id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-dark-100/50 border border-dark-200/30 hover:border-neon-cyan/20 transition-colors"
-                  >
-                    {/* Token image */}
-                    {launch.token_image_url ? (
-                      <img
-                        src={launch.token_image_url}
-                        alt={launch.ticker}
-                        className="w-10 h-10 rounded-full border border-dark-200/50"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan font-bold text-xs">
-                        {launch.ticker.substring(0, 2)}
-                      </div>
-                    )}
+                {recentLaunches.map((launch) => {
+                  const Row = launch.pump_url ? "a" : "div";
+                  const linkProps = launch.pump_url
+                    ? { href: launch.pump_url, target: "_blank" as const, rel: "noopener noreferrer" }
+                    : {};
+                  return (
+                    <Row
+                      key={launch.token_id}
+                      {...linkProps}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-dark-100/50 border border-dark-200/30 hover:border-neon-cyan/20 transition-colors cursor-pointer block no-underline text-inherit"
+                    >
+                      {/* Token image */}
+                      {launch.token_image_url ? (
+                        <img
+                          src={launch.token_image_url}
+                          alt={launch.ticker}
+                          className="w-10 h-10 rounded-full border border-dark-200/50"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan font-bold text-xs">
+                          {launch.ticker.substring(0, 2)}
+                        </div>
+                      )}
 
-                    {/* Token info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{launch.token_name}</p>
-                        {launch.pump_url && (
-                          <TokenBadge
-                            pumpUrl={launch.pump_url}
-                            ticker={launch.ticker}
-                            size="sm"
-                            showTicker={false}
-                          />
+                      {/* Token info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{launch.token_name}</p>
+                          {launch.pump_url && (
+                            <TokenBadge
+                              pumpUrl={launch.pump_url}
+                              ticker={launch.ticker}
+                              size="sm"
+                              showTicker={false}
+                            />
+                          )}
+                        </div>
+                        {launch.headline_id && (
+                          <span
+                            className="text-xs text-gray-400 truncate block"
+                          >
+                            {launch.headline_title || "View article"}
+                          </span>
                         )}
                       </div>
-                      {launch.headline_id && (
-                        <a
-                          href={`/article/${launch.headline_id}`}
-                          className="text-xs text-gray-400 hover:text-neon-cyan truncate block"
-                        >
-                          {launch.headline_title || "View article"}
-                        </a>
-                      )}
-                    </div>
 
-                    {/* Ticker */}
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-sm text-neon-cyan">${launch.ticker}</p>
-                      <p className="text-[10px] text-gray-500">
-                        {getTimeAgo(new Date(launch.created_at))}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                      {/* Ticker */}
+                      <div className="text-right">
+                        <p className="font-mono font-bold text-sm text-neon-cyan">${launch.ticker}</p>
+                        <p className="text-[10px] text-gray-500">
+                          {getTimeAgo(new Date(launch.created_at))}
+                        </p>
+                      </div>
+                    </Row>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -185,11 +197,6 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* How to Earn CTA */}
-        <div className="mt-12 border-t border-dark-200/30 pt-8">
-          <h3 className="text-lg font-bold text-white mb-4 text-center">Want to be on this leaderboard?</h3>
-          <SubmitCTA />
-        </div>
       </div>
       </div>
     </main>
