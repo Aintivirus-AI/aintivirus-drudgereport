@@ -962,13 +962,18 @@ export function getRecentSubmissionByUrl(
 /**
  * Get top submitters by published article count (for leaderboard).
  */
-export function getTopSubmitters(limit: number = 20): Array<{
+export function getTopSubmitters(period: string = "all", limit: number = 20): Array<{
   telegram_username: string | null;
   telegram_user_id: string;
   sol_address: string;
   published_count: number;
   total_submissions: number;
 }> {
+  let dateFilter = "";
+  if (period === "day") dateFilter = "AND created_at >= datetime('now', '-1 day')";
+  else if (period === "week") dateFilter = "AND created_at >= datetime('now', '-7 days')";
+  else if (period === "month") dateFilter = "AND created_at >= datetime('now', '-30 days')";
+
   const stmt = db.prepare(`
     SELECT 
       telegram_username,
@@ -977,6 +982,7 @@ export function getTopSubmitters(limit: number = 20): Array<{
       SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published_count,
       COUNT(*) as total_submissions
     FROM submissions
+    WHERE 1=1 ${dateFilter}
     GROUP BY telegram_user_id
     HAVING published_count > 0
     ORDER BY published_count DESC
@@ -994,7 +1000,7 @@ export function getTopSubmitters(limit: number = 20): Array<{
 /**
  * Get recent token launches with headline data (for leaderboard).
  */
-export function getRecentTokenLaunches(limit: number = 20): Array<{
+export function getRecentTokenLaunches(period: string = "all", limit: number = 20): Array<{
   token_id: number;
   token_name: string;
   ticker: string;
@@ -1005,6 +1011,11 @@ export function getRecentTokenLaunches(limit: number = 20): Array<{
   headline_id: number;
   created_at: string;
 }> {
+  let dateFilter = "";
+  if (period === "day") dateFilter = "AND t.created_at >= datetime('now', '-1 day')";
+  else if (period === "week") dateFilter = "AND t.created_at >= datetime('now', '-7 days')";
+  else if (period === "month") dateFilter = "AND t.created_at >= datetime('now', '-30 days')";
+
   const stmt = db.prepare(`
     SELECT 
       t.id as token_id,
@@ -1018,7 +1029,7 @@ export function getRecentTokenLaunches(limit: number = 20): Array<{
       t.created_at
     FROM tokens t
     LEFT JOIN headlines h ON t.headline_id = h.id
-    WHERE t.mint_address IS NOT NULL
+    WHERE t.mint_address IS NOT NULL ${dateFilter}
     ORDER BY t.created_at DESC
     LIMIT ?
   `);

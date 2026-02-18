@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { getTopSubmitters, getRecentTokenLaunches, getPublishedTodayCount } from "@/lib/db";
-import { TokenBadge } from "@/components/TokenBadge";
+import { getPublishedTodayCount } from "@/lib/db";
 import { SubmitCTA } from "@/components/SubmitCTA";
 import { TopCoinsRibbon } from "@/components/TopCoinsRibbon";
 import { SentimentMeter } from "@/components/SentimentMeter";
 import { WarRoomFeed } from "@/components/WarRoomFeed";
 import { TopEarners } from "@/components/TopEarners";
+import { TopSubmitters } from "@/components/TopSubmitters";
+import { TokenLaunches } from "@/components/TokenLaunches";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const revalidate = 30;
@@ -16,8 +17,6 @@ export const metadata: Metadata = {
 };
 
 export default function AnalyticsPage() {
-  const topSubmitters = getTopSubmitters(15);
-  const recentLaunches = getRecentTokenLaunches(15);
   const publishedToday = getPublishedTodayCount();
 
   return (
@@ -62,125 +61,14 @@ export default function AnalyticsPage() {
           <SubmitCTA />
         </div>
 
-        {/* Leaderboard Section */}
+        {/* Leaderboard Section - 3 uniform columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Top Submitters */}
           <div>
-            <h2 className="text-lg font-semibold text-neon-cyan border-b border-dark-200/30 pb-2 mb-4">
-              TOP SUBMITTERS
-            </h2>
-            {topSubmitters.length === 0 ? (
-              <p className="text-gray-500 text-sm py-8 text-center">No published submissions yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {topSubmitters.map((submitter, index) => (
-                  <div
-                    key={submitter.telegram_user_id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-dark-100/50 border border-dark-200/30 hover:border-dark-200/60 transition-colors"
-                  >
-                    {/* Rank */}
-                    <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
-                      ${index === 0 ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" :
-                        index === 1 ? "bg-gray-400/20 text-gray-300 border border-gray-400/30" :
-                        index === 2 ? "bg-orange-500/20 text-orange-400 border border-orange-500/30" :
-                        "bg-dark-200/50 text-gray-500 border border-dark-200/30"
-                      }
-                    `}>
-                      {index + 1}
-                    </div>
-
-                    {/* Name */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate font-mono">
-                        {submitter.sol_address.slice(0, 4)}...{submitter.sol_address.slice(-4)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {submitter.total_submissions} submitted, {Math.round((submitter.published_count / submitter.total_submissions) * 100)}% hit rate
-                      </p>
-                    </div>
-
-                    {/* Published count */}
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-neon-cyan">{submitter.published_count}</p>
-                      <p className="text-[10px] text-gray-500 uppercase">published</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <TopSubmitters />
           </div>
-
-          {/* Recent Token Launches */}
           <div>
-            <h2 className="text-lg font-semibold text-neon-cyan border-b border-dark-200/30 pb-2 mb-4">
-              RECENT TOKEN LAUNCHES
-            </h2>
-            {recentLaunches.length === 0 ? (
-              <p className="text-gray-500 text-sm py-8 text-center">No tokens launched yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {recentLaunches.map((launch) => {
-                  const Row = launch.pump_url ? "a" : "div";
-                  const linkProps = launch.pump_url
-                    ? { href: launch.pump_url, target: "_blank" as const, rel: "noopener noreferrer" }
-                    : {};
-                  return (
-                    <Row
-                      key={launch.token_id}
-                      {...linkProps}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-dark-100/50 border border-dark-200/30 hover:border-neon-cyan/20 transition-colors cursor-pointer block no-underline text-inherit"
-                    >
-                      {/* Token image */}
-                      {launch.token_image_url ? (
-                        <img
-                          src={launch.token_image_url}
-                          alt={launch.ticker}
-                          className="w-10 h-10 rounded-full border border-dark-200/50"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan font-bold text-xs">
-                          {launch.ticker.substring(0, 2)}
-                        </div>
-                      )}
-
-                      {/* Token info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm">{launch.token_name}</p>
-                          {launch.pump_url && (
-                            <TokenBadge
-                              pumpUrl={launch.pump_url}
-                              ticker={launch.ticker}
-                              size="sm"
-                              showTicker={false}
-                            />
-                          )}
-                        </div>
-                        {launch.headline_id && (
-                          <span
-                            className="text-xs text-gray-400 truncate block"
-                          >
-                            {launch.headline_title || "View article"}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Ticker */}
-                      <div className="text-right">
-                        <p className="font-mono font-bold text-sm text-neon-cyan">${launch.ticker}</p>
-                        <p className="text-[10px] text-gray-500">
-                          {getTimeAgo(new Date(launch.created_at))}
-                        </p>
-                      </div>
-                    </Row>
-                  );
-                })}
-              </div>
-            )}
+            <TokenLaunches />
           </div>
-
-          {/* Top Earners */}
           <div>
             <TopEarners />
           </div>
@@ -201,15 +89,4 @@ export default function AnalyticsPage() {
       </div>
     </main>
   );
-}
-
-function getTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }

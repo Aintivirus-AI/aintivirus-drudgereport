@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default function LeaderboardPage() {
-  const topSubmitters = getTopSubmitters(15);
-  const recentLaunches = getRecentTokenLaunches(15);
+  const topSubmitters = getTopSubmitters("all", 15);
+  const recentLaunches = getRecentTokenLaunches("all", 15);
   const publishedToday = getPublishedTodayCount();
 
   return (
