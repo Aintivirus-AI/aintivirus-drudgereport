@@ -24,7 +24,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        mono: ["JetBrains Mono", "Fira Code", "monospace"],
+        mono: ["var(--font-jetbrains-mono)", "JetBrains Mono", "Fira Code", "monospace"],
+        sans: ["var(--font-space-grotesk)", "Space Grotesk", "system-ui", "sans-serif"],
+        display: ["var(--font-syne)", "Syne", "system-ui", "sans-serif"],
       },
       boxShadow: {
         neon: "0 0 10px #00ffff, 0 0 20px #00ffff40",
