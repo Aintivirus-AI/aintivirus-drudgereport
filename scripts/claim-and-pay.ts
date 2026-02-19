@@ -50,8 +50,9 @@ function hr(char = "═", len = 60): string {
   return char.repeat(len);
 }
 
-function shortDate(iso: string): string {
-  const d = new Date(iso + (iso.includes("T") ? "" : "T00:00:00Z"));
+function shortDate(raw: string): string {
+  const d = new Date(raw.replace(" ", "T") + "Z");
+  if (isNaN(d.getTime())) return "n/a";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
