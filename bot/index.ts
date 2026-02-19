@@ -49,12 +49,13 @@ import {
   purgeStaleSubmissions,
   getFinancialStats,
   getVisitStats,
+  tickerExists,
 } from "../lib/db";
 import { generateMcAfeeTake, scoreHeadlineImportance, generateCoinSummary } from "../lib/mcafee-commentator";
 
 // Session data interface
 interface SessionData {
-  step: "idle" | "awaiting_url" | "awaiting_headline_choice" | "awaiting_image_choice" | "awaiting_column" | "awaiting_main_url" | "awaiting_main_headline_choice" | "awaiting_main_image_choice" | "awaiting_main_subtitle" | "awaiting_submit_url" | "awaiting_sol_address" | "awaiting_cotd_url" | "awaiting_cotd_headline_choice" | "awaiting_cotd_image_choice" | "awaiting_cotd_description";
+  step: "idle" | "awaiting_url" | "awaiting_headline_choice" | "awaiting_image_choice" | "awaiting_column" | "awaiting_main_url" | "awaiting_main_headline_choice" | "awaiting_main_image_choice" | "awaiting_main_subtitle" | "awaiting_submit_url" | "awaiting_sol_address" | "awaiting_token_name" | "awaiting_cotd_url" | "awaiting_cotd_headline_choice" | "awaiting_cotd_image_choice" | "awaiting_cotd_description";
   pendingUrl?: string;
   pendingTitle?: string;
   pendingColumn?: "left" | "right";
@@ -62,6 +63,8 @@ interface SessionData {
   includeImage?: boolean;
   generatedHeadlines?: string[];
   pendingSolAddress?: string;
+  pendingTokenName?: string;
+  pendingTicker?: string;
   pendingPageContent?: { title: string; description: string; content: string; imageUrl: string | null };
 }
 
@@ -640,6 +643,79 @@ function resetSession(session: SessionData) {
   session.includeImage = undefined;
   session.generatedHeadlines = undefined;
   session.pendingSolAddress = undefined;
+  session.pendingTokenName = undefined;
+  session.pendingTicker = undefined;
+}
+
+async function finalizeSubmission(ctx: MyContext, userId: number, session: SessionData) {
+  try {
+    const contentType = detectContentType(session.pendingUrl!);
+    const submission = createSubmission(
+      userId.toString(),
+      session.pendingSolAddress!,
+      session.pendingUrl!,
+      contentType,
+      ctx.from?.username,
+      session.pendingTokenName,
+      session.pendingTicker
+    );
+
+    const walletShort = `${session.pendingSolAddress!.substring(0, 6)}...${session.pendingSolAddress!.substring(session.pendingSolAddress!.length - 4)}`;
+    const tokenLine = session.pendingTokenName && session.pendingTicker
+      ? `Token: \`${session.pendingTokenName}\` \\($${session.pendingTicker}\\)\n`
+      : `Token: _AI will generate_\n`;
+
+    await ctx.reply(
+      `*Submission Received*\n` +
+      `─────────────────────\n\n` +
+      `ID: \`#${submission.id}\`\n` +
+      `URL: \`${session.pendingUrl!.substring(0, 40)}${session.pendingUrl!.length > 40 ? "\\.\\.\\." : ""}\`\n` +
+      `Wallet: \`${walletShort}\`\n` +
+      tokenLine + `\n` +
+      `AI is reviewing your submission now\\.\n` +
+      `You'll be notified here when it's approved or rejected\\.\n\n` +
+      `*If approved:*\n` +
+      `1\\. A token launches on pump\\.fun\n` +
+      `2\\. You receive 50% of creator fees\n\n` +
+      `Use /mystatus to check all your submissions\\.`,
+      { parse_mode: "MarkdownV2" }
+    );
+
+    // Notify admins
+    for (const adminId of ADMIN_IDS) {
+      try {
+        const tokenInfo = session.pendingTokenName && session.pendingTicker
+          ? `Token: ${session.pendingTokenName} ($${session.pendingTicker})\n`
+          : "";
+        await bot.api.sendMessage(
+          adminId,
+          `*New Submission*\n\n` +
+          `ID: \`#${submission.id}\`\n` +
+          `From: ${ctx.from?.username ? `@${ctx.from.username}` : userId}\n` +
+          `Type: ${contentTypeLabel(contentType)}\n` +
+          `URL: \`${session.pendingUrl!.substring(0, 50)}...\`\n` +
+          tokenInfo,
+          { parse_mode: "Markdown" }
+        );
+      } catch {
+        // Admin might have blocked the bot
+      }
+    }
+
+    if (API_SECRET) {
+      fetch(`${API_URL}/api/scheduler/trigger?action=validate`, {
+        method: "POST",
+        headers: { "x-api-key": API_SECRET },
+      }).catch((err) =>
+        console.warn("[Bot] Failed to trigger validation:", err)
+      );
+    }
+  } catch (error) {
+    console.error("Error creating submission:", error);
+    await ctx.reply("Failed to create submission. Try again with /submit");
+  }
+
+  resetSession(session);
 }
 
 // Helper: Format content type as readable label
@@ -890,9 +966,10 @@ bot.command("submit", async (ctx) => {
     `*Process:*\n` +
     `1. Send a URL (article, tweet, YouTube, TikTok)\n` +
     `2. Provide your Solana wallet address\n` +
-    `3. AI reviews your submission\n` +
-    `4. If approved, a token launches on pump.fun\n` +
-    `5. You receive 50% of creator fees\n\n` +
+    `3. Name your token (or let AI pick)\n` +
+    `4. AI reviews your submission\n` +
+    `5. If approved, a token launches on pump.fun\n` +
+    `6. You receive 50% of creator fees\n\n` +
     `*Rules:*\n` +
     `- Must be real, verifiable news\n` +
     `- Must be recent (under 24 hours old)\n` +
@@ -1295,68 +1372,69 @@ bot.on("message:text", async (ctx) => {
       return;
     }
 
-    try {
-      const contentType = detectContentType(session.pendingUrl!);
-      const submission = createSubmission(
-        userId.toString(),
-        text,
-        session.pendingUrl!,
-        contentType,
-        ctx.from?.username
-      );
+    session.step = "awaiting_token_name";
+    await ctx.reply(
+      `*Name Your Token \\(Optional\\)*\n` +
+      `─────────────────────\n\n` +
+      `Want to pick a name and ticker for your memecoin?\n\n` +
+      `Send it as: \`Name / TICKER\`\n` +
+      `Example: \`Moon Dog / MOONDOG\`\n\n` +
+      `*Rules:*\n` +
+      `\\- Name: 1\\-30 characters\n` +
+      `\\- Ticker: 3\\-8 uppercase letters \\(A\\-Z only\\)\n\n` +
+      `Or send /skip to let AI name it\\.`,
+      { parse_mode: "MarkdownV2" }
+    );
+    return;
+  }
 
-      const pendingCount = getPendingSubmissionsCount();
-      const walletShort = `${text.substring(0, 6)}...${text.substring(text.length - 4)}`;
+  if (session.step === "awaiting_token_name") {
+    const trimmed = text.trim();
 
-      await ctx.reply(
-        `*Submission Received*\n` +
-        `─────────────────────\n\n` +
-        `ID: \`#${submission.id}\`\n` +
-        `URL: \`${session.pendingUrl!.substring(0, 40)}...\`\n` +
-        `Wallet: \`${walletShort}\`\n\n` +
-        `AI is reviewing your submission now\\.\n` +
-        `You'll be notified here when it's approved or rejected\\.\n\n` +
-        `*If approved:*\n` +
-        `1. A token launches on pump\\.fun\n` +
-        `2. You receive 50% of creator fees\n\n` +
-        `Use /mystatus to check all your submissions\\.`,
-        { parse_mode: "Markdown" }
-      );
-
-      // Notify admins
-      for (const adminId of ADMIN_IDS) {
-        try {
-          await bot.api.sendMessage(
-            adminId,
-            `*New Submission*\n\n` +
-            `ID: \`#${submission.id}\`\n` +
-            `From: ${ctx.from?.username ? `@${ctx.from.username}` : userId}\n` +
-            `Type: ${contentTypeLabel(contentType)}\n` +
-            `URL: \`${session.pendingUrl!.substring(0, 50)}...\``,
-            { parse_mode: "Markdown" }
-          );
-        } catch {
-          // Admin might have blocked the bot
-        }
-      }
-
-      // Trigger immediate validation — fire-and-forget.
-      // The API endpoint has its own debounce (30s) so rapid submissions
-      // are coalesced into a single validation cycle.
-      if (API_SECRET) {
-        fetch(`${API_URL}/api/scheduler/trigger?action=validate`, {
-          method: "POST",
-          headers: { "x-api-key": API_SECRET },
-        }).catch((err) =>
-          console.warn("[Bot] Failed to trigger validation:", err)
-        );
-      }
-    } catch (error) {
-      console.error("Error creating submission:", error);
-      await ctx.reply("Failed to create submission. Try again with /submit");
+    if (trimmed.toLowerCase() === "/skip" || trimmed.toLowerCase() === "skip") {
+      // No custom name — AI will generate
+      await finalizeSubmission(ctx, userId, session);
+      return;
     }
 
-    resetSession(session);
+    // Parse "Name / TICKER" format
+    const slashIdx = trimmed.lastIndexOf("/");
+    if (slashIdx === -1) {
+      await ctx.reply(
+        "Use the format: `Name / TICKER`\nExample: `Moon Dog / MOONDOG`\n\nOr send /skip to let AI name it.",
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    const rawName = trimmed.substring(0, slashIdx).trim();
+    const rawTicker = trimmed.substring(slashIdx + 1).trim().toUpperCase().replace(/[^A-Z]/g, "");
+
+    if (rawName.length < 1 || rawName.length > 30) {
+      await ctx.reply(
+        "Token name must be 1-30 characters.\n\nTry again or send /skip.",
+      );
+      return;
+    }
+
+    if (rawTicker.length < 3 || rawTicker.length > 8) {
+      await ctx.reply(
+        "Ticker must be 3-8 uppercase letters (A-Z only).\n\nTry again or send /skip.",
+      );
+      return;
+    }
+
+    if (tickerExists(rawTicker)) {
+      await ctx.reply(
+        `Ticker \`${rawTicker}\` is already taken. Pick another one or send /skip.`,
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    session.pendingTokenName = rawName;
+    session.pendingTicker = rawTicker;
+    await finalizeSubmission(ctx, userId, session);
     return;
   }
 

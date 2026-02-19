@@ -95,6 +95,8 @@ db.exec(`
     content_hash TEXT,
     embedding TEXT,
     cached_content TEXT,
+    custom_token_name TEXT,
+    custom_ticker TEXT,
     published_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -305,6 +307,17 @@ try {
 }
 try {
   db.exec(`ALTER TABLE tokens ADD COLUMN theme TEXT`);
+} catch {
+  // Column already exists
+}
+// Migration: Add custom token name/ticker to submissions
+try {
+  db.exec(`ALTER TABLE submissions ADD COLUMN custom_token_name TEXT`);
+} catch {
+  // Column already exists
+}
+try {
+  db.exec(`ALTER TABLE submissions ADD COLUMN custom_ticker TEXT`);
 } catch {
   // Column already exists
 }
@@ -737,14 +750,16 @@ export function createSubmission(
   solAddress: string,
   url: string,
   contentType: ContentType = "other",
-  telegramUsername?: string
+  telegramUsername?: string,
+  customTokenName?: string,
+  customTicker?: string
 ): Submission {
   const stmt = db.prepare(`
-    INSERT INTO submissions (telegram_user_id, telegram_username, sol_address, url, content_type)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO submissions (telegram_user_id, telegram_username, sol_address, url, content_type, custom_token_name, custom_ticker)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     RETURNING *
   `);
-  return stmt.get(telegramUserId, telegramUsername || null, solAddress, url, contentType) as Submission;
+  return stmt.get(telegramUserId, telegramUsername || null, solAddress, url, contentType, customTokenName || null, customTicker || null) as Submission;
 }
 
 /**

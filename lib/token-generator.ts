@@ -39,12 +39,20 @@ const MAX_IMAGE_DOWNLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
  */
 export async function generateTokenMetadata(
   headline: string,
-  content: PageContent
+  content: PageContent,
+  overrides?: { name?: string; ticker?: string }
 ): Promise<TokenMetadata> {
   console.log(`[TokenGenerator] Headline: "${headline}"`);
 
+  const hasCustomNameAndTicker = overrides?.name && overrides?.ticker;
+  if (hasCustomNameAndTicker) {
+    console.log(`[TokenGenerator] Using custom name/ticker: "${overrides.name}" ($${overrides.ticker})`);
+  }
+
   const [nameAndTicker, imageUrl, bannerUrl, description] = await Promise.all([
-    generateNameAndTicker(headline, content),
+    hasCustomNameAndTicker
+      ? Promise.resolve({ name: overrides.name!, ticker: overrides.ticker! })
+      : generateNameAndTicker(headline, content),
     generateTokenLogo(headline, content),
     generateTokenBanner(headline, content),
     generateTokenDescription(headline, content),

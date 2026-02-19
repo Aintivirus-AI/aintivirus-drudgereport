@@ -82,6 +82,8 @@ export interface Submission {
   content_hash: string | null;
   embedding: string | null; // JSON stringified array for semantic search
   cached_content: string | null; // JSON stringified PageContent from validation
+  custom_token_name: string | null;
+  custom_ticker: string | null;
   published_at: string | null;
   created_at: string;
 }
@@ -92,6 +94,8 @@ export interface CreateSubmissionRequest {
   sol_address: string;
   url: string;
   content_type?: ContentType;
+  custom_token_name?: string;
+  custom_ticker?: string;
 }
 
 // ============= TOKEN TYPES =============

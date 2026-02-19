@@ -343,7 +343,10 @@ async function publishOneSubmission(submission: Submission): Promise<Submission 
       console.log(
         `[Scheduler] Generating token metadata for headline #${headlineRecord.id}`
       );
-      const tokenMetadata = await generateTokenMetadata(headline, content);
+      const nameOverrides = submission.custom_token_name && submission.custom_ticker
+        ? { name: submission.custom_token_name, ticker: submission.custom_ticker }
+        : undefined;
+      const tokenMetadata = await generateTokenMetadata(headline, content, nameOverrides);
 
       console.log(
         `[Scheduler] Deploying token: ${tokenMetadata.name} (${tokenMetadata.ticker})`
