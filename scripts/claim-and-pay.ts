@@ -8,8 +8,8 @@
  *   3. Distributes each submitter's share pro-rata based on trading volume
  *
  * Usage:
- *   npx tsx scripts/claim-and-pay.ts                              # claim + distribute
- *   npx tsx scripts/claim-and-pay.ts --dry-run                    # read-only preview (no claim, no send)
+ *   npx tsx scripts/claim-and-pay.ts                              # claim + pay submitters
+ *   npx tsx scripts/claim-and-pay.ts --dry-run                    # claim + show what's owed (no payments sent)
  *   npx tsx scripts/claim-and-pay.ts --skip-claim --amount 1.5    # skip claim, distribute a specific amount
  */
 
@@ -69,20 +69,7 @@ async function main(): Promise<void> {
   let distributionLamports = 0;
   let claimSignature: string | null = null;
 
-  if (isDryRun) {
-    // Dry run: never touch the chain. Use --amount if given, else show 1 SOL preview.
-    const amountStr = getFlag("--amount");
-    distributionLamports = amountStr
-      ? Math.floor(parseFloat(amountStr) * LAMPORTS_PER_SOL)
-      : LAMPORTS_PER_SOL;
-
-    console.log(
-      amountStr
-        ? `\nDry run with ${sol(distributionLamports)} SOL (from --amount)`
-        : `\nDry run — showing preview as if 1 SOL were distributed`
-    );
-
-  } else if (skipClaim) {
+  if (skipClaim) {
     // Skip claim: user provides amount manually
     const amountStr = getFlag("--amount");
     if (!amountStr || isNaN(parseFloat(amountStr))) {
@@ -91,10 +78,10 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     distributionLamports = Math.floor(parseFloat(amountStr) * LAMPORTS_PER_SOL);
-    console.log(`\nSkipping claim. Distributing ${sol(distributionLamports)} SOL from wallet.`);
+    console.log(`\nSkipping claim. Using ${sol(distributionLamports)} SOL.`);
 
   } else {
-    // Normal mode: claim fees, then distribute what was received
+    // Claim fees from pump.fun (runs in both normal and dry-run mode)
     console.log(`\nClaiming creator fees from pump.fun...`);
 
     const connection = getConnection();
@@ -117,17 +104,13 @@ async function main(): Promise<void> {
         console.log(`  New balance: ${sol(after.lamports)} SOL`);
       } else {
         console.log(`  No fees received (balance went from ${sol(balanceBefore)} to ${sol(after.lamports)} SOL).`);
-        console.log(`  This likely means there were no unclaimed creator fees on pump.fun.`);
-        console.log(`\n  If you know there's SOL to distribute, re-run with:`);
-        console.log(`    npx tsx scripts/claim-and-pay.ts --skip-claim --amount <sol>\n`);
+        console.log(`  This likely means there were no unclaimed creator fees on pump.fun.\n`);
         return;
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("400") || msg.includes("500") || msg.includes("No fees")) {
-        console.log(`  No fees to claim. (pump.fun: ${msg.slice(0, 60)})`);
-        console.log(`\n  If you know there's SOL to distribute, re-run with:`);
-        console.log(`    npx tsx scripts/claim-and-pay.ts --skip-claim --amount <sol>\n`);
+        console.log(`  No fees to claim. (pump.fun: ${msg.slice(0, 60)})\n`);
         return;
       }
       console.error(`  Claim failed: ${msg}`);
@@ -173,8 +156,8 @@ async function main(): Promise<void> {
 
   // ── Dry run stops here ──
   if (isDryRun) {
-    console.log(`\n  This was a dry run. No SOL was sent.`);
-    console.log(`  To claim and distribute for real, run without --dry-run.\n`);
+    console.log(`\n  Fees have been claimed to your wallet. No payments were sent.`);
+    console.log(`  To pay out, run without --dry-run.\n`);
     return;
   }
 
