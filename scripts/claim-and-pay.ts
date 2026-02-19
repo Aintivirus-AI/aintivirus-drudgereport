@@ -50,6 +50,11 @@ function hr(char = "═", len = 60): string {
   return char.repeat(len);
 }
 
+function shortDate(iso: string): string {
+  const d = new Date(iso + (iso.includes("T") ? "" : "T00:00:00Z"));
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 async function main(): Promise<void> {
   console.log(`\n${hr()}`);
   console.log(`  CLAIM & PAY${isDryRun ? "  [DRY RUN — nothing will be sent]" : ""}`);
@@ -152,8 +157,10 @@ async function main(): Promise<void> {
   console.log(`\n  Distributing ${sol(distributionLamports)} SOL:\n`);
   for (const s of shares) {
     const token = tokens.find((t) => t.id === s.tokenId);
+    const created = token?.created_at ? shortDate(token.created_at) : "???";
     console.log(
       `  ${(token?.ticker || `#${s.tokenId}`).padEnd(12)} ` +
+      `${created.padEnd(8)} ` +
       `${(s.sharePercent * 100).toFixed(1).padStart(5)}%  ` +
       `${sol(s.submitterLamports).padStart(12)} SOL  → ` +
       `${s.deployerSolAddress.slice(0, 8)}…${s.deployerSolAddress.slice(-4)}`
