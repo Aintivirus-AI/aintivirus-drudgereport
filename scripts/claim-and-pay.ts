@@ -3,15 +3,14 @@
  * distribute submitter shares.
  *
  * What it does:
- *   1. Checks the master wallet balance
- *   2. Claims all accumulated creator fees from pump.fun
- *   3. Checks the balance again to determine how much was claimed
- *   4. Distributes each submitter's share pro-rata based on trading volume
+ *   1. Claims all accumulated creator fees from pump.fun
+ *   2. Checks the wallet balance diff to determine how much was claimed
+ *   3. Distributes each submitter's share pro-rata based on trading volume
  *
  * Usage:
- *   npx tsx scripts/claim-and-pay.ts              # claim + distribute
- *   npx tsx scripts/claim-and-pay.ts --dry-run    # claim only, show what WOULD be distributed
- *   npx tsx scripts/claim-and-pay.ts --skip-claim # skip the claim step, distribute from existing balance
+ *   npx tsx scripts/claim-and-pay.ts                              # claim + distribute
+ *   npx tsx scripts/claim-and-pay.ts --dry-run                    # read-only preview (no claim, no send)
+ *   npx tsx scripts/claim-and-pay.ts --skip-claim --amount 1.5    # skip claim, distribute a specific amount
  */
 
 import dotenv from "dotenv";
@@ -38,123 +37,157 @@ const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
 const skipClaim = args.includes("--skip-claim");
 
+function getFlag(flag: string): string | undefined {
+  const idx = args.indexOf(flag);
+  return idx >= 0 && idx + 1 < args.length ? args[idx + 1] : undefined;
+}
+
 function sol(lamports: number): string {
   return (lamports / LAMPORTS_PER_SOL).toFixed(6);
 }
 
-function line(char = "═", len = 60): string {
+function hr(char = "═", len = 60): string {
   return char.repeat(len);
 }
 
 async function main(): Promise<void> {
-  console.log(`\n${line()}`);
-  console.log(`  CLAIM & PAY${isDryRun ? "  [DRY RUN]" : ""}`);
-  console.log(line());
+  console.log(`\n${hr()}`);
+  console.log(`  CLAIM & PAY${isDryRun ? "  [DRY RUN — nothing will be sent]" : ""}`);
+  console.log(hr());
 
-  const connection = getConnection();
-  const wallet = secureGetWallet("claim-and-pay");
+  // ── Show wallet balance ──
+  const balance = await secureGetBalance("claim-and-pay");
+  console.log(`\nMaster wallet balance: ${sol(balance.lamports)} SOL`);
 
-  // Step 1: Check balance before
-  const before = await secureGetBalance("claim-and-pay:before");
-  console.log(`\nMaster wallet balance: ${sol(before.lamports)} SOL`);
-
-  // Step 2: Claim fees from pump.fun
+  // ── Determine distribution amount ──
+  let distributionLamports = 0;
   let claimSignature: string | null = null;
-  let claimedLamports = 0;
 
-  if (skipClaim) {
-    console.log(`\n[Skipping claim — using existing balance]`);
+  if (isDryRun) {
+    // Dry run: never touch the chain. Use --amount if given, else show 1 SOL preview.
+    const amountStr = getFlag("--amount");
+    distributionLamports = amountStr
+      ? Math.floor(parseFloat(amountStr) * LAMPORTS_PER_SOL)
+      : LAMPORTS_PER_SOL;
+
+    console.log(
+      amountStr
+        ? `\nDry run with ${sol(distributionLamports)} SOL (from --amount)`
+        : `\nDry run — showing preview as if 1 SOL were distributed`
+    );
+
+  } else if (skipClaim) {
+    // Skip claim: user provides amount manually
+    const amountStr = getFlag("--amount");
+    if (!amountStr || isNaN(parseFloat(amountStr))) {
+      console.log(`\n--skip-claim requires --amount <sol>. Example:`);
+      console.log(`  npx tsx scripts/claim-and-pay.ts --skip-claim --amount 1.5\n`);
+      process.exit(1);
+    }
+    distributionLamports = Math.floor(parseFloat(amountStr) * LAMPORTS_PER_SOL);
+    console.log(`\nSkipping claim. Distributing ${sol(distributionLamports)} SOL from wallet.`);
+
   } else {
+    // Normal mode: claim fees, then distribute what was received
     console.log(`\nClaiming creator fees from pump.fun...`);
+
+    const connection = getConnection();
+    const wallet = secureGetWallet("claim-and-pay");
+    const balanceBefore = balance.lamports;
+
     try {
       claimSignature = await callCollectCreatorFee(connection, wallet);
-      console.log(`Claim tx: ${claimSignature}`);
+      console.log(`  Claim tx: ${claimSignature}`);
 
-      // Brief pause for balance to settle
+      // Wait for balance to update
       await new Promise((r) => setTimeout(r, 3000));
 
       const after = await secureGetBalance("claim-and-pay:after");
-      claimedLamports = after.lamports - before.lamports;
+      const diff = after.lamports - balanceBefore;
 
-      if (claimedLamports > 0) {
-        console.log(`Claimed: ${sol(claimedLamports)} SOL`);
-        console.log(`New balance: ${sol(after.lamports)} SOL`);
+      if (diff > 0) {
+        distributionLamports = diff;
+        console.log(`  Received:    ${sol(diff)} SOL`);
+        console.log(`  New balance: ${sol(after.lamports)} SOL`);
       } else {
-        console.log(`No net SOL received (balance unchanged or decreased from tx fees).`);
-        console.log(`New balance: ${sol(after.lamports)} SOL`);
+        console.log(`  No fees received (balance went from ${sol(balanceBefore)} to ${sol(after.lamports)} SOL).`);
+        console.log(`  This likely means there were no unclaimed creator fees on pump.fun.`);
+        console.log(`\n  If you know there's SOL to distribute, re-run with:`);
+        console.log(`    npx tsx scripts/claim-and-pay.ts --skip-claim --amount <sol>\n`);
+        return;
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("400") || msg.includes("500") || msg.includes("No fees")) {
-        console.log(`No fees to claim (pump.fun returned: ${msg.slice(0, 80)})`);
-      } else {
-        console.error(`Claim failed: ${msg}`);
-        process.exit(1);
+        console.log(`  No fees to claim. (pump.fun: ${msg.slice(0, 60)})`);
+        console.log(`\n  If you know there's SOL to distribute, re-run with:`);
+        console.log(`    npx tsx scripts/claim-and-pay.ts --skip-claim --amount <sol>\n`);
+        return;
       }
+      console.error(`  Claim failed: ${msg}`);
+      process.exit(1);
     }
   }
 
-  // Step 3: Show distribution preview
+  // ── Fetch active tokens and volume data ──
   const tokens = getActiveTokensForClaim();
   if (tokens.length === 0) {
     console.log(`\nNo active tokens with mint addresses. Nothing to distribute.`);
     return;
   }
 
-  console.log(`\n${line("─")}`);
+  console.log(`\n${hr("─")}`);
   console.log(`  DISTRIBUTION — ${tokens.length} active token(s)`);
-  console.log(line("─"));
+  console.log(hr("─"));
 
   const volumes = await fetchTokenVolumes(tokens);
+  const shares = calculateProRataShares(volumes, tokens, distributionLamports);
 
-  // Use claimed amount if we claimed, otherwise ask user or show preview
-  let distributionLamports = claimedLamports;
-
-  if (distributionLamports <= 0 && !skipClaim) {
-    console.log(`\nNothing to distribute (0 SOL claimed).`);
+  if (shares.length === 0) {
+    console.log(`\n  No tokens qualify for distribution (zero trading volume).\n`);
     return;
   }
 
-  if (skipClaim) {
-    // When skipping claim, use an --amount flag or show a preview with 1 SOL
-    const amountArg = args.find((_, i) => args[i - 1] === "--amount");
-    if (amountArg) {
-      distributionLamports = Math.floor(parseFloat(amountArg) * LAMPORTS_PER_SOL);
-    } else {
-      console.log(`\nNo --amount specified with --skip-claim. Showing preview with 1 SOL.\n`);
-      distributionLamports = LAMPORTS_PER_SOL;
-      // Force dry run mode for preview
-      showPreview(volumes, tokens, distributionLamports);
-      console.log(`\nTo distribute, re-run with: --skip-claim --amount <sol>`);
-      return;
-    }
+  // ── Show the breakdown ──
+  console.log(`\n  Distributing ${sol(distributionLamports)} SOL:\n`);
+  for (const s of shares) {
+    const token = tokens.find((t) => t.id === s.tokenId);
+    console.log(
+      `  ${(token?.ticker || `#${s.tokenId}`).padEnd(12)} ` +
+      `${(s.sharePercent * 100).toFixed(1).padStart(5)}%  ` +
+      `${sol(s.submitterLamports).padStart(12)} SOL  → ` +
+      `${s.deployerSolAddress.slice(0, 8)}…${s.deployerSolAddress.slice(-4)}`
+    );
   }
 
+  const totalToSubmitters = shares.reduce((sum, s) => sum + s.submitterLamports, 0);
+  console.log(`\n  Total to submitters: ${sol(totalToSubmitters)} SOL`);
+
+  // ── Dry run stops here ──
   if (isDryRun) {
-    showPreview(volumes, tokens, distributionLamports);
-    console.log(`\nDry run complete. No SOL was sent.`);
-    console.log(`Re-run without --dry-run to actually distribute.`);
+    console.log(`\n  This was a dry run. No SOL was sent.`);
+    console.log(`  To claim and distribute for real, run without --dry-run.\n`);
     return;
   }
 
-  // Step 4: Distribute
+  // ── Execute distribution ──
   const txSig = claimSignature || `manual-${Date.now()}`;
-  console.log(`\nDistributing ${sol(distributionLamports)} SOL across ${tokens.length} token(s)...\n`);
+  console.log(`\n  Sending payments...\n`);
 
   const result = await distributeBulkClaim(txSig, distributionLamports, false);
 
   if (result.success) {
-    console.log(`\n${line()}`);
-    console.log(`  DISTRIBUTION COMPLETE`);
-    console.log(line());
-    console.log(`  Batch ID:     ${result.batchId}`);
-    console.log(`  Tokens:       ${result.tokensCount}`);
-    console.log(`  Distributed:  ${sol(result.distributedLamports || 0)} SOL`);
+    console.log(`\n${hr()}`);
+    console.log(`  DONE`);
+    console.log(hr());
+    console.log(`  Batch ID:    ${result.batchId}`);
+    console.log(`  Tokens:      ${result.tokensCount}`);
+    console.log(`  Distributed: ${sol(result.distributedLamports || 0)} SOL`);
 
     if (result.batchId) {
       const summary = getClaimDistributionSummary(result.batchId);
       if (summary.length > 0) {
-        console.log(`\n  Per-token breakdown:\n`);
+        console.log(`\n  Per-token results:\n`);
         for (const s of summary) {
           const status = s.allocation_status === "paid" ? "PAID" : s.allocation_status.toUpperCase();
           const txShort = s.submitter_tx_signature ? s.submitter_tx_signature.slice(0, 12) + "…" : "-";
@@ -167,38 +200,11 @@ async function main(): Promise<void> {
         }
       }
     }
-    console.log(`\n${line()}\n`);
+    console.log(`\n${hr()}\n`);
   } else {
     console.error(`\nDistribution failed: ${result.error}`);
     process.exit(1);
   }
-}
-
-function showPreview(
-  volumes: Awaited<ReturnType<typeof fetchTokenVolumes>>,
-  tokens: ReturnType<typeof getActiveTokensForClaim>,
-  totalLamports: number
-): void {
-  const shares = calculateProRataShares(volumes, tokens, totalLamports);
-
-  if (shares.length === 0) {
-    console.log(`  No tokens qualify for distribution (zero volume).`);
-    return;
-  }
-
-  console.log(`\n  Preview: distributing ${sol(totalLamports)} SOL\n`);
-  for (const s of shares) {
-    const token = tokens.find((t) => t.id === s.tokenId);
-    console.log(
-      `  ${(token?.ticker || `#${s.tokenId}`).padEnd(12)} ` +
-      `${(s.sharePercent * 100).toFixed(1).padStart(5)}%  ` +
-      `${sol(s.submitterLamports).padStart(12)} SOL  → ` +
-      `${s.deployerSolAddress.slice(0, 8)}…${s.deployerSolAddress.slice(-4)}`
-    );
-  }
-
-  const totalSubmitter = shares.reduce((sum, s) => sum + s.submitterLamports, 0);
-  console.log(`\n  Total to submitters: ${sol(totalSubmitter)} SOL`);
 }
 
 main().catch((err) => {
