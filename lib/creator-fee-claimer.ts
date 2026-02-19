@@ -113,7 +113,7 @@ export async function claimAllCreatorFees(): Promise<ClaimCycleResult> {
  * Call PumpPortal's collectCreatorFee Local Transaction API.
  * Returns the confirmed transaction signature.
  */
-async function callCollectCreatorFee(
+export async function callCollectCreatorFee(
   connection: Connection,
   wallet: Keypair
 ): Promise<string> {
