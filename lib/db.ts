@@ -1897,6 +1897,32 @@ export function getClaimDistributionSummary(batchId: number): Array<{
   }>;
 }
 
+/**
+ * Total SOL claimed (via fee claimer) since the last distribution batch.
+ * Reads from wallet_audit_log where operation = 'claim_creator_fee'.
+ * If no distribution has ever been run, returns all-time claimed total.
+ */
+export function getUndistrbutedClaimTotal(): { lamports: number; claimCount: number; since: string | null } {
+  const lastBatch = db.prepare(`
+    SELECT created_at FROM claim_batches ORDER BY created_at DESC LIMIT 1
+  `).get() as { created_at: string } | undefined;
+
+  const since = lastBatch?.created_at ?? null;
+
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(amount_lamports), 0) AS total,
+      COUNT(*) AS cnt
+    FROM wallet_audit_log
+    WHERE operation = 'claim_creator_fee'
+      AND success = 1
+      AND amount_lamports > 0
+      ${since ? `AND timestamp > '${since}'` : ""}
+  `).get() as { total: number; cnt: number };
+
+  return { lamports: row.total, claimCount: row.cnt, since };
+}
+
 // ============= COMMENTS =============
 
 export interface CommentRow {

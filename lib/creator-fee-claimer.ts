@@ -20,6 +20,7 @@ import {
 } from "./solana-wallet";
 import {
   secureGetWallet,
+  secureGetBalance,
 } from "./secure-wallet";
 import { logWalletOperation } from "./wallet-audit";
 
@@ -67,21 +68,30 @@ export async function claimAllCreatorFees(): Promise<ClaimCycleResult> {
   try {
     console.log("[FeeClaimer] Claiming master wallet creator fees...");
 
+    const balanceBefore = await secureGetBalance("fee-claimer:before");
     const signature = await callCollectCreatorFee(connection, masterWallet);
     console.log(`[FeeClaimer] Master wallet claim tx: ${signature}`);
+
+    // Brief wait for balance to settle, then measure how much we received
+    await new Promise((r) => setTimeout(r, 2000));
+    const balanceAfter = await secureGetBalance("fee-claimer:after");
+    const claimedLamports = Math.max(0, balanceAfter.lamports - balanceBefore.lamports);
+
+    console.log(`[FeeClaimer] Claimed: ${claimedLamports / LAMPORTS_PER_SOL} SOL`);
 
     logWalletOperation({
       operation: "claim_creator_fee",
       caller: "fee-claimer:master",
       success: true,
       txSignature: signature,
+      amountLamports: claimedLamports,
     });
 
     return {
       processed: 1,
       claimed: 1,
       failed: 0,
-      totalClaimedLamports: 0,
+      totalClaimedLamports: claimedLamports,
       results: [],
     };
   } catch (error) {

@@ -1,16 +1,15 @@
 /**
- * Claim & Pay — one-step script to claim pump.fun creator fees and
- * distribute submitter shares.
+ * Claim & Pay — distribute pump.fun creator fees to submitters.
  *
- * What it does:
- *   1. Claims all accumulated creator fees from pump.fun
- *   2. Checks the wallet balance diff to determine how much was claimed
- *   3. Distributes each submitter's share pro-rata based on trading volume
+ * The automated scheduler claims fees every 30 min and logs the amounts.
+ * This script totals up everything claimed since the last distribution
+ * and pays submitters their share pro-rata by trading volume.
  *
  * Usage:
- *   npx tsx scripts/claim-and-pay.ts                              # claim + pay submitters
- *   npx tsx scripts/claim-and-pay.ts --dry-run                    # claim + show what's owed (no payments sent)
- *   npx tsx scripts/claim-and-pay.ts --skip-claim --amount 1.5    # skip claim, distribute a specific amount
+ *   npx tsx scripts/claim-and-pay.ts                  # distribute what's owed
+ *   npx tsx scripts/claim-and-pay.ts --dry-run        # preview only, no payments sent
+ *   npx tsx scripts/claim-and-pay.ts --amount 0.5     # override amount (instead of auto-detect)
+ *   npx tsx scripts/claim-and-pay.ts --claim           # also claim fees before distributing
  */
 
 import dotenv from "dotenv";
@@ -31,11 +30,12 @@ import {
 import {
   getActiveTokensForClaim,
   getClaimDistributionSummary,
+  getUndistrbutedClaimTotal,
 } from "../lib/db";
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
-const skipClaim = args.includes("--skip-claim");
+const doClaim = args.includes("--claim");
 
 function getFlag(flag: string): string | undefined {
   const idx = args.indexOf(flag);
@@ -58,30 +58,14 @@ function shortDate(raw: string): string {
 
 async function main(): Promise<void> {
   console.log(`\n${hr()}`);
-  console.log(`  CLAIM & PAY${isDryRun ? "  [DRY RUN — nothing will be sent]" : ""}`);
+  console.log(`  CLAIM & PAY${isDryRun ? "  [DRY RUN]" : ""}`);
   console.log(hr());
 
-  // ── Show wallet balance ──
   const balance = await secureGetBalance("claim-and-pay");
   console.log(`\nMaster wallet balance: ${sol(balance.lamports)} SOL`);
 
-  // ── Determine distribution amount ──
-  let distributionLamports = 0;
-  let claimSignature: string | null = null;
-
-  if (skipClaim) {
-    // Skip claim: user provides amount manually
-    const amountStr = getFlag("--amount");
-    if (!amountStr || isNaN(parseFloat(amountStr))) {
-      console.log(`\n--skip-claim requires --amount <sol>. Example:`);
-      console.log(`  npx tsx scripts/claim-and-pay.ts --skip-claim --amount 1.5\n`);
-      process.exit(1);
-    }
-    distributionLamports = Math.floor(parseFloat(amountStr) * LAMPORTS_PER_SOL);
-    console.log(`\nSkipping claim. Using ${sol(distributionLamports)} SOL.`);
-
-  } else {
-    // Claim fees from pump.fun (runs in both normal and dry-run mode)
+  // ── Step 1: Optionally claim fees first ──
+  if (doClaim) {
     console.log(`\nClaiming creator fees from pump.fun...`);
 
     const connection = getConnection();
@@ -89,59 +73,87 @@ async function main(): Promise<void> {
     const balanceBefore = balance.lamports;
 
     try {
-      claimSignature = await callCollectCreatorFee(connection, wallet);
-      console.log(`  Claim tx: ${claimSignature}`);
+      const signature = await callCollectCreatorFee(connection, wallet);
+      console.log(`  Claim tx: ${signature}`);
 
-      // Wait for balance to update
       await new Promise((r) => setTimeout(r, 3000));
-
       const after = await secureGetBalance("claim-and-pay:after");
-      const diff = after.lamports - balanceBefore;
+      const diff = Math.max(0, after.lamports - balanceBefore);
 
       if (diff > 0) {
-        distributionLamports = diff;
-        console.log(`  Received:    ${sol(diff)} SOL`);
-        console.log(`  New balance: ${sol(after.lamports)} SOL`);
+        console.log(`  Received: ${sol(diff)} SOL`);
       } else {
-        console.log(`  No fees received (balance went from ${sol(balanceBefore)} to ${sol(after.lamports)} SOL).`);
-        console.log(`  This likely means there were no unclaimed creator fees on pump.fun.\n`);
-        return;
+        console.log(`  No new fees to claim.`);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("400") || msg.includes("500") || msg.includes("No fees")) {
-        console.log(`  No fees to claim. (pump.fun: ${msg.slice(0, 60)})\n`);
-        return;
+        console.log(`  No fees to claim.`);
+      } else {
+        console.error(`  Claim failed: ${msg}`);
+        process.exit(1);
       }
-      console.error(`  Claim failed: ${msg}`);
-      process.exit(1);
     }
   }
 
-  // ── Fetch active tokens and volume data ──
+  // ── Step 2: Determine distribution amount ──
+  let distributionLamports = 0;
+  const amountStr = getFlag("--amount");
+
+  if (amountStr) {
+    const parsed = parseFloat(amountStr);
+    if (isNaN(parsed) || parsed <= 0) {
+      console.error(`\nInvalid --amount: "${amountStr}". Must be a positive number.\n`);
+      process.exit(1);
+    }
+    distributionLamports = Math.floor(parsed * LAMPORTS_PER_SOL);
+    console.log(`\nUsing manual amount: ${sol(distributionLamports)} SOL`);
+  } else {
+    // Auto-detect: sum all fees claimed since last distribution
+    const undistributed = getUndistrbutedClaimTotal();
+
+    console.log(`\nFees claimed since last distribution:`);
+    console.log(`  Claims:  ${undistributed.claimCount} successful claim(s)`);
+    console.log(`  Total:   ${sol(undistributed.lamports)} SOL`);
+    if (undistributed.since) {
+      console.log(`  Since:   ${undistributed.since}`);
+    } else {
+      console.log(`  Since:   (first distribution — all time)`);
+    }
+
+    distributionLamports = undistributed.lamports;
+  }
+
+  if (distributionLamports <= 0) {
+    console.log(`\nNothing to distribute (0 SOL claimed since last payout).`);
+    console.log(`If the automated claimer just started recording amounts, run with --amount to distribute manually.\n`);
+    return;
+  }
+
+  // ── Step 3: Fetch tokens and calculate shares ──
   const tokens = getActiveTokensForClaim();
   if (tokens.length === 0) {
-    console.log(`\nNo active tokens with mint addresses. Nothing to distribute.`);
+    console.log(`\nNo active tokens with mint addresses. Nothing to distribute.\n`);
     return;
   }
 
   console.log(`\n${hr("─")}`);
-  console.log(`  DISTRIBUTION — ${tokens.length} active token(s)`);
+  console.log(`  Distributing ${sol(distributionLamports)} SOL across ${tokens.length} token(s)`);
   console.log(hr("─"));
 
   const volumes = await fetchTokenVolumes(tokens);
   const shares = calculateProRataShares(volumes, tokens, distributionLamports);
 
   if (shares.length === 0) {
-    console.log(`\n  No tokens qualify for distribution (zero trading volume).\n`);
+    console.log(`\n  No tokens qualify (zero trading volume).\n`);
     return;
   }
 
-  // ── Show the breakdown ──
-  console.log(`\n  Distributing ${sol(distributionLamports)} SOL:\n`);
+  // ── Step 4: Show breakdown ──
+  console.log("");
   for (const s of shares) {
     const token = tokens.find((t) => t.id === s.tokenId);
-    const created = token?.created_at ? shortDate(token.created_at) : "???";
+    const created = token?.created_at ? shortDate(token.created_at) : "n/a";
     console.log(
       `  ${(token?.ticker || `#${s.tokenId}`).padEnd(12)} ` +
       `${created.padEnd(8)} ` +
@@ -156,13 +168,13 @@ async function main(): Promise<void> {
 
   // ── Dry run stops here ──
   if (isDryRun) {
-    console.log(`\n  Fees have been claimed to your wallet. No payments were sent.`);
-    console.log(`  To pay out, run without --dry-run.\n`);
+    console.log(`\n  DRY RUN — no payments were sent.`);
+    console.log(`  Run without --dry-run to pay out.\n`);
     return;
   }
 
-  // ── Execute distribution ──
-  const txSig = claimSignature || `manual-${Date.now()}`;
+  // ── Step 5: Send payments ──
+  const txSig = `distribution-${Date.now()}`;
   console.log(`\n  Sending payments...\n`);
 
   const result = await distributeBulkClaim(txSig, distributionLamports, false);
